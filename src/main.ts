@@ -1,8 +1,18 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { configureApplication } from './common/configure-application';
+import { Environment } from './config/environment';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { rawBody: true });
+  configureApplication(app);
+
+  const config = app.get(ConfigService<Environment, true>);
+  await app.listen(config.get('PORT', { infer: true }));
 }
-bootstrap();
+
+void bootstrap().catch(() => {
+  console.error('[BOOTSTRAP_FAILED]');
+  process.exitCode = 1;
+});
