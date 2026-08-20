@@ -30,7 +30,7 @@ export class AccessTokenGuard implements CanActivate {
       );
     }
 
-    request.auth = await this.auth.authenticate(match[1]);
+    request.auth = await this.auth.authenticate(match[1], request.requestId);
     return true;
   }
 }

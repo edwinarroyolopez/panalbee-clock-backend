@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import request from 'supertest';
+import { APPOINTMENT_MANAGEMENT_TOKEN_HEADER } from '../src/common/http-headers';
 import {
   login,
   seedTenant,
@@ -66,7 +67,7 @@ describe('booking tenancy and ownership (security e2e)', () => {
       serviceId: a.service,
       staffId: a.staff,
       customerId: a.customer,
-      startsAt: '2026-09-02T14:00:00Z',
+      startsAt: '2099-09-02T14:00:00Z',
       idempotencyKey: 'security-foreign-resource',
     };
     for (const foreign of [
@@ -136,7 +137,7 @@ describe('booking tenancy and ownership (security e2e)', () => {
         locationId: b.location,
         serviceId: b.service,
         staffId: b.staff,
-        date: '2026-09-02',
+        date: '2099-09-02',
       })
       .expect(404);
 
@@ -161,7 +162,7 @@ describe('booking tenancy and ownership (security e2e)', () => {
       customerName: 'Public Customer',
       customerPhone: '+12025550888',
       customerEmail: 'PUBLIC@example.test',
-      startsAt: '2026-09-02T14:00:00Z',
+      startsAt: '2099-09-02T14:00:00Z',
       idempotencyKey: 'security-public-create-1',
     };
     const created = await request(testApp.server)
@@ -197,6 +198,11 @@ describe('booking tenancy and ownership (security e2e)', () => {
         phone: body.customerPhone,
       }),
     ).toBe(1);
+    const customer = await testApp.database.models.customer
+      .findOne({ tenantId: a.tenant, phone: body.customerPhone })
+      .lean()
+      .exec();
+    expect(customer?.email).toBe('public@example.test');
   });
 
   it('requires slug and opaque token ownership for list, cancel, and reschedule', async () => {
@@ -222,29 +228,68 @@ describe('booking tenancy and ownership (security e2e)', () => {
         staffId: a.staff,
         customerName: 'Public Customer',
         customerPhone: '+12025550888',
-        startsAt: '2026-09-02T15:00:00Z',
+        customerEmail: 'replacement@example.test',
+        startsAt: '2099-09-02T15:00:00Z',
         idempotencyKey: 'security-public-create-2',
       })
       .expect(201);
     const appointment = second.body as PublicAppointment;
     const managementToken = appointment.managementToken!;
+    const customer = await testApp.database.models.customer
+      .findOne({ tenantId: a.tenant, phone: '+12025550888' })
+      .lean()
+      .exec();
+    expect(customer?.email).toBe('public@example.test');
+
+    const managementPath = '/api/v1/public/booking-security-a/appointments';
+    const assertOwnedAppointment = ({
+      body,
+    }: {
+      body: { items: PublicAppointment[] };
+    }) =>
+      expect(body.items).toEqual([
+        expect.objectContaining({
+          id: appointment.id,
+          locationName: 'Main',
+          serviceName: 'Consultation',
+          staffName: 'Alex',
+          timezone: 'America/Bogota',
+          localStartsAt: '2099-09-02T10:00',
+          localEndsAt: '2099-09-02T11:00',
+        }),
+      ]);
 
     await request(testApp.server)
-      .get('/api/v1/public/booking-security-a/appointments')
+      .get(managementPath)
+      .set(APPOINTMENT_MANAGEMENT_TOKEN_HEADER, managementToken)
+      .expect(200)
+      .expect('Cache-Control', 'private, no-store')
+      .expect(assertOwnedAppointment);
+    await request(testApp.server)
+      .get(managementPath)
       .query({ managementToken })
       .expect(200)
-      .expect(({ body }: { body: { items: PublicAppointment[] } }) =>
-        expect(body.items).toEqual([
-          expect.objectContaining({
-            id: appointment.id,
-            locationName: 'Main',
-            serviceName: 'Consultation',
-            staffName: 'Alex',
-            timezone: 'America/Bogota',
-            localStartsAt: '2026-09-02T10:00',
-            localEndsAt: '2026-09-02T11:00',
-          }),
-        ]),
+      .expect(assertOwnedAppointment);
+    await request(testApp.server)
+      .get(managementPath)
+      .set(APPOINTMENT_MANAGEMENT_TOKEN_HEADER, managementToken)
+      .query({ managementToken: 'x'.repeat(43) })
+      .expect(400)
+      .expect(({ body }: { body: { reasonCode: string } }) =>
+        expect(body.reasonCode).toBe('APPOINTMENT_MANAGEMENT_TOKEN_CONFLICT'),
+      );
+    await request(testApp.server)
+      .get(managementPath)
+      .set(APPOINTMENT_MANAGEMENT_TOKEN_HEADER, 'invalid')
+      .expect(400)
+      .expect(({ body }: { body: { reasonCode: string } }) =>
+        expect(body.reasonCode).toBe('APPOINTMENT_MANAGEMENT_TOKEN_INVALID'),
+      );
+    await request(testApp.server)
+      .get(managementPath)
+      .expect(400)
+      .expect(({ body }: { body: { reasonCode: string } }) =>
+        expect(body.reasonCode).toBe('APPOINTMENT_MANAGEMENT_TOKEN_INVALID'),
       );
     await request(testApp.server)
       .get('/api/v1/public/booking-security-b/appointments')
@@ -257,17 +302,17 @@ describe('booking tenancy and ownership (security e2e)', () => {
       )
       .send({
         managementToken: `${managementToken}x`,
-        startsAt: '2026-09-02T16:00:00Z',
+        startsAt: '2099-09-02T16:00:00Z',
       })
       .expect(404);
     await request(testApp.server)
       .post(
         `/api/v1/public/booking-security-a/appointments/${appointment.id}/reschedule`,
       )
-      .send({ managementToken, startsAt: '2026-09-02T16:00:00Z' })
+      .send({ managementToken, startsAt: '2099-09-02T16:00:00Z' })
       .expect(200)
       .expect(({ body }: { body: PublicAppointment }) =>
-        expect(body.startsAt).toBe('2026-09-02T16:00:00.000Z'),
+        expect(body.startsAt).toBe('2099-09-02T16:00:00.000Z'),
       );
     await request(testApp.server)
       .post(

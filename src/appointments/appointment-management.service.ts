@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ClientSession } from 'mongoose';
+import { AccountPublicAccessService } from '../accounts/account-public-access.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
@@ -15,7 +16,7 @@ interface ManagementAccess {
   tenantId: string;
   appointmentId: string;
   actorUserId: string | null;
-  actorType: 'TENANT_USER' | 'CUSTOMER';
+  actorType: 'TENANT_USER' | 'INTERNAL_USER' | 'CUSTOMER';
   publicOnly: boolean;
   token?: string;
 }
@@ -29,6 +30,7 @@ export class AppointmentManagementService {
     private readonly intervalLocks: AppointmentIntervalLockService,
     private readonly publicQuery: AppointmentPublicQueryService,
     private readonly rescheduleRelations: AppointmentRescheduleRelationService,
+    private readonly publicAccessService: AccountPublicAccessService,
   ) {}
 
   async listPublic(
@@ -42,6 +44,7 @@ export class AppointmentManagementService {
     tenantId: string,
     appointmentId: string,
     actorUserId: string,
+    actorType: 'TENANT_USER' | 'INTERNAL_USER',
     reason: string,
   ): Promise<AppointmentView> {
     return this.cancel(
@@ -49,7 +52,7 @@ export class AppointmentManagementService {
         tenantId,
         appointmentId,
         actorUserId,
-        actorType: 'TENANT_USER',
+        actorType,
         publicOnly: false,
       },
       reason,
@@ -72,6 +75,7 @@ export class AppointmentManagementService {
     tenantId: string,
     appointmentId: string,
     actorUserId: string,
+    actorType: 'TENANT_USER' | 'INTERNAL_USER',
     startsAt: string,
   ): Promise<AppointmentView> {
     return this.reschedule(
@@ -79,7 +83,7 @@ export class AppointmentManagementService {
         tenantId,
         appointmentId,
         actorUserId,
-        actorType: 'TENANT_USER',
+        actorType,
         publicOnly: false,
       },
       startsAt,
@@ -104,6 +108,13 @@ export class AppointmentManagementService {
   ): Promise<AppointmentView> {
     return this.database.withTransaction(async (session) => {
       const appointment = await this.load(access, session);
+      const normalizedReason = reason.trim();
+      if (
+        appointment.status === 'CANCELLED' &&
+        appointment.cancellationReason === normalizedReason
+      ) {
+        return appointmentView(appointment);
+      }
       this.assertActive(appointment);
       const cancelledAt = new Date();
       const updated = await this.database.models.appointment
@@ -117,7 +128,7 @@ export class AppointmentManagementService {
             $set: {
               status: 'CANCELLED',
               cancelledAt,
-              cancellationReason: reason.trim(),
+              cancellationReason: normalizedReason,
             },
           },
           { returnDocument: 'after', session },
@@ -135,7 +146,7 @@ export class AppointmentManagementService {
         updated,
         'BOOKING_CANCELLED',
         'APPOINTMENT_CANCELLED',
-        reason.trim(),
+        normalizedReason,
       );
       return appointmentView(updated.toObject());
     });
@@ -147,8 +158,17 @@ export class AppointmentManagementService {
   ): Promise<AppointmentView> {
     const startsAt = new Date(startsAtInput);
     return this.database.withTransaction(async (session) => {
+      if (access.publicOnly) {
+        await this.publicAccessService.assertTenantBookingEnabled(
+          access.tenantId,
+          session,
+        );
+      }
       const appointment = await this.load(access, session);
       this.assertActive(appointment);
+      if (appointment.startsAt.getTime() === startsAt.getTime()) {
+        return appointmentView(appointment);
+      }
       const relation = await this.rescheduleRelations.resolve(
         access.tenantId,
         access.publicOnly,
@@ -267,18 +287,8 @@ function actorFor(access: ManagementAccess) {
   };
 }
 
-function appointmentNotFound(): AppException {
-  return new AppException(
-    404,
-    'APPOINTMENT_NOT_FOUND',
-    'Appointment not found',
-  );
-}
+const appointmentNotFound = (): AppException =>
+  new AppException(404, 'APPOINTMENT_NOT_FOUND', 'Appointment not found');
 
-function appointmentNotActive(): AppException {
-  return new AppException(
-    409,
-    'APPOINTMENT_NOT_ACTIVE',
-    'Appointment is not active',
-  );
-}
+const appointmentNotActive = (): AppException =>
+  new AppException(409, 'APPOINTMENT_NOT_ACTIVE', 'Appointment is not active');

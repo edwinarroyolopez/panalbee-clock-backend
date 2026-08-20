@@ -124,7 +124,7 @@ export class ConversationBookingHandler implements ConversationCommandHandler {
       session,
       envelope.tenantId,
       null,
-      true,
+      'CUSTOMER',
       appointment,
     );
   }

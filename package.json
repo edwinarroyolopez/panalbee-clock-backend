@@ -26,6 +26,7 @@
     "test:security": "ts-node --transpile-only scripts/run-mongodb-tests.ts --testPathPatterns=security",
     "test:concurrency": "ts-node --transpile-only scripts/run-mongodb-tests.ts --testPathPatterns=concurrency",
     "test:mongodb": "ts-node --transpile-only scripts/run-mongodb-tests.ts",
+    "test:account-saas:connected": "ts-node --transpile-only scripts/run-account-saas-connected.ts",
     "test:release": "yarn lint && yarn test:unit && yarn test:mongodb && yarn build && yarn audit:source",
     "audit:source": "bash scripts/audit-source.sh"
   },

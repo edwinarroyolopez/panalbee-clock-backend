@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication, ValidationError } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppException } from './app-exception';
+import { APPOINTMENT_MANAGEMENT_TOKEN_HEADER } from './http-headers';
 import { GlobalHttpExceptionFilter } from './http-exception.filter';
 import { requestIdMiddleware } from './request-id.middleware';
 import type { Environment } from '../config/environment';
@@ -51,7 +52,12 @@ export function configureApplication(app: INestApplication): void {
       callback: (error: Error | null, allow?: boolean) => void,
     ): void => callback(null, !origin || allowedOrigins.includes(origin)),
     credentials: true,
-    allowedHeaders: ['authorization', 'content-type', 'x-request-id'],
+    allowedHeaders: [
+      'authorization',
+      'content-type',
+      'x-request-id',
+      APPOINTMENT_MANAGEMENT_TOKEN_HEADER,
+    ],
     exposedHeaders: ['x-request-id'],
   });
   app.enableShutdownHooks();

@@ -58,7 +58,7 @@ describe('appointment confirmation (concurrency e2e)', () => {
         .send({
           ...common,
           customerId: ids.customerA,
-          startsAt: '2026-09-03T14:00:00Z',
+          startsAt: '2099-09-03T14:00:00Z',
           idempotencyKey: 'concurrent-confirmation-a',
         }),
       request(testApp.server)
@@ -67,7 +67,7 @@ describe('appointment confirmation (concurrency e2e)', () => {
         .send({
           ...common,
           customerId: ids.customerB,
-          startsAt: '2026-09-03T14:15:00Z',
+          startsAt: '2099-09-03T14:15:00Z',
           idempotencyKey: 'concurrent-confirmation-b',
         }),
     ]);
@@ -140,7 +140,7 @@ describe('appointment confirmation (concurrency e2e)', () => {
       staffId: ids.staff,
       customerName: 'Ada Customer',
       customerPhone: '+570009000001',
-      startsAt: '2026-09-04T18:00:00Z',
+      startsAt: '2099-09-04T18:00:00Z',
       idempotencyKey: 'concurrent-public-idempotency',
     };
     const responses = await Promise.all([
@@ -195,5 +195,54 @@ describe('appointment confirmation (concurrency e2e)', () => {
         action: 'APPOINTMENT_CREATED',
       }),
     ).toBe(1);
+  });
+
+  it('atomically upserts one new public customer for two concurrent bookings', async () => {
+    const customerPhone = '+12025550999';
+    const common = {
+      locationId: ids.location,
+      serviceId: ids.service,
+      staffId: ids.staff,
+      customerName: 'Concurrent New Customer',
+      customerPhone,
+    };
+    const responses = await Promise.all([
+      request(testApp.server)
+        .post('/api/v1/public/booking-concurrency/appointments')
+        .send({
+          ...common,
+          customerEmail: 'concurrent@example.test',
+          startsAt: '2099-09-05T14:00:00Z',
+          idempotencyKey: 'concurrent-customer-upsert-a',
+        }),
+      request(testApp.server)
+        .post('/api/v1/public/booking-concurrency/appointments')
+        .send({
+          ...common,
+          startsAt: '2099-09-05T15:00:00Z',
+          idempotencyKey: 'concurrent-customer-upsert-b',
+        }),
+    ]);
+    expect(responses.map(({ status }) => status)).toEqual([201, 201]);
+
+    const customers = await testApp.database.models.customer
+      .find({ tenantId: ids.tenant, phone: customerPhone })
+      .lean()
+      .exec();
+    expect(customers).toHaveLength(1);
+    expect(customers[0].email).toBe('concurrent@example.test');
+    const appointments = await testApp.database.models.appointment
+      .find({
+        tenantId: ids.tenant,
+        idempotencyKey: {
+          $in: ['concurrent-customer-upsert-a', 'concurrent-customer-upsert-b'],
+        },
+      })
+      .lean()
+      .exec();
+    expect(appointments).toHaveLength(2);
+    expect(new Set(appointments.map(({ customerId }) => customerId))).toEqual(
+      new Set([customers[0]._id]),
+    );
   });
 });

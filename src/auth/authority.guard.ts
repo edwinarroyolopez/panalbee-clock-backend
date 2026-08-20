@@ -24,8 +24,9 @@ export class AuthorityGuard implements CanActivate {
     if (policy?.type === 'authenticated') return true;
     if (
       policy?.type === 'tenant' &&
-      auth.actorType === 'TENANT' &&
-      policy.roles.includes(auth.tenantRole)
+      ((auth.actorType === 'TENANT' &&
+        policy.roles.includes(auth.tenantRole)) ||
+        (auth.actorType === 'DELEGATED' && policy.roles.includes('OWNER')))
     ) {
       return true;
     }

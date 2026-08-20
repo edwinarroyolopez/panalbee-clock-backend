@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime, IANAZone } from 'luxon';
 import { ClientSession } from 'mongoose';
+import { randomUUID } from 'node:crypto';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import { AppointmentView, appointmentView } from './appointment.view';
@@ -21,6 +22,7 @@ export interface CreateIntent {
   notes: string | null;
   source: 'ADMIN' | 'WEB';
   actorUserId: string | null;
+  actorType: 'TENANT_USER' | 'INTERNAL_USER' | 'CUSTOMER';
   publicOnly: boolean;
   fingerprint: string;
 }
@@ -62,28 +64,32 @@ export class AppointmentCreationStore {
     session: ClientSession,
   ): Promise<string> {
     const input = intent.publicCustomer!;
-    const existing = await this.database.models.customer
-      .findOne({ tenantId: intent.tenantId, phone: input.phone })
-      .session(session)
-      .exec();
-    if (existing) {
-      if (!existing.email && input.email) {
-        existing.email = input.email;
-        await existing.save({ session });
-      }
-      return existing._id;
-    }
-    const [customer] = await this.database.models.customer.create(
-      [
+    const customer = await this.database.models.customer
+      .findOneAndUpdate(
+        { tenantId: intent.tenantId, phone: input.phone },
         {
-          tenantId: intent.tenantId,
-          fullName: input.name,
-          phone: input.phone,
-          ...(input.email ? { email: input.email } : {}),
+          $setOnInsert: {
+            _id: randomUUID(),
+            tenantId: intent.tenantId,
+            fullName: input.name,
+            phone: input.phone,
+          },
         },
-      ],
-      { session },
-    );
+        { upsert: true, returnDocument: 'after', session },
+      )
+      .exec();
+    if (!customer) throw new Error('Customer upsert did not return a record');
+    if (input.email) {
+      await this.database.models.customer.updateOne(
+        {
+          _id: customer._id,
+          tenantId: intent.tenantId,
+          $or: [{ email: { $exists: false } }, { email: null }, { email: '' }],
+        },
+        { $set: { email: input.email } },
+        { runValidators: true, session },
+      );
+    }
     return customer._id;
   }
 

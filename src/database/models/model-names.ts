@@ -1,4 +1,7 @@
 export const MODEL_NAMES = {
+  Account: 'Account',
+  AccountPublicProfile: 'AccountPublicProfile',
+  DelegatedSession: 'DelegatedSession',
   Tenant: 'Tenant',
   Location: 'Location',
   User: 'User',
@@ -21,6 +24,12 @@ export const MODEL_NAMES = {
 } as const;
 
 export const INDEX_NAMES = {
+  accountSlug: 'account_slug_unique',
+  accountTenant: 'account_tenant_unique',
+  accountPublicProfile: 'account_public_profile_unique',
+  delegatedSessionExchangeCode: 'delegated_session_exchange_code_unique',
+  delegatedSessionTargetStatusExpiry:
+    'delegated_session_target_status_expiry_lookup',
   tenantSlug: 'tenant_slug_unique',
   locationOrdering: 'location_ordering',
   userEmail: 'user_email_lowercase_unique',
