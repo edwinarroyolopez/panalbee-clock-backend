@@ -16,6 +16,7 @@ const accountPayload = {
   slug: 'final-bee-studio',
   ownerEmail: 'owner@saas-final.test',
   ownerPhone: '+573001234599',
+  ownerPassword: 'final-owner-password',
   planCode: 'PRO',
   status: 'ACTIVE',
   publicBookingEnabled: true,
@@ -76,7 +77,7 @@ describe('Account SaaS final connected scenario (e2e)', () => {
       slug: accountPayload.slug,
       owner: {
         email: accountPayload.ownerEmail,
-        status: 'PENDING_ACTIVATION',
+        status: 'ACTIVE',
       },
       publicProfile: { bookingEnabled: true },
     });
@@ -103,7 +104,7 @@ describe('Account SaaS final connected scenario (e2e)', () => {
           _id: account.owner.id,
           email: accountPayload.ownerEmail,
           actorType: 'TENANT',
-          status: 'PENDING_ACTIVATION',
+          status: 'ACTIVE',
         }),
         database.models.tenantMembership.countDocuments({
           tenantId: account.tenantId,
