@@ -1,6 +1,14 @@
 import { ModelDefinition } from '@nestjs/mongoose';
 import { Connection, Model } from 'mongoose';
 import {
+  AccountEntity,
+  AccountPublicProfileEntity,
+  AccountPublicProfileSchema,
+  AccountSchema,
+  DelegatedSessionEntity,
+  DelegatedSessionSchema,
+} from './account.models';
+import {
   AppointmentEntity,
   AppointmentIntervalLockEntity,
   AppointmentIntervalLockSchema,
@@ -47,6 +55,7 @@ import { UuidEntity } from './schema-helpers';
 import { UserEntity, UserSchema } from './user.model';
 
 export * from './booking.models';
+export * from './account.models';
 export * from './communication.models';
 export * from './core.models';
 export * from './model-names';
@@ -54,6 +63,12 @@ export * from './schema-helpers';
 export * from './user.model';
 
 export const CLOCK_MODEL_DEFINITIONS: ModelDefinition[] = [
+  { name: MODEL_NAMES.Account, schema: AccountSchema },
+  {
+    name: MODEL_NAMES.AccountPublicProfile,
+    schema: AccountPublicProfileSchema,
+  },
+  { name: MODEL_NAMES.DelegatedSession, schema: DelegatedSessionSchema },
   { name: MODEL_NAMES.Tenant, schema: TenantSchema },
   { name: MODEL_NAMES.Location, schema: LocationSchema },
   { name: MODEL_NAMES.User, schema: UserSchema },
@@ -85,6 +100,9 @@ export const CLOCK_MODEL_DEFINITIONS: ModelDefinition[] = [
 ];
 
 export interface ClockModels {
+  account: Model<AccountEntity>;
+  accountPublicProfile: Model<AccountPublicProfileEntity>;
+  delegatedSession: Model<DelegatedSessionEntity>;
   tenant: Model<TenantEntity>;
   location: Model<LocationEntity>;
   user: Model<UserEntity>;
@@ -112,6 +130,12 @@ function registeredModel<T>(connection: Connection, name: string): Model<T> {
 
 export function clockModels(connection: Connection): ClockModels {
   return {
+    account: registeredModel(connection, MODEL_NAMES.Account),
+    accountPublicProfile: registeredModel(
+      connection,
+      MODEL_NAMES.AccountPublicProfile,
+    ),
+    delegatedSession: registeredModel(connection, MODEL_NAMES.DelegatedSession),
     tenant: registeredModel(connection, MODEL_NAMES.Tenant),
     location: registeredModel(connection, MODEL_NAMES.Location),
     user: registeredModel(connection, MODEL_NAMES.User),

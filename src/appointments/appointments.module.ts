@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AccountsModule } from '../accounts/accounts.module';
 import { AvailabilityModule } from '../availability/availability.module';
 import { CONVERSATION_COMMAND_HANDLER } from '../conversations/conversation-command.port';
 import { AppointmentCreationStore } from './appointment-creation.store';
@@ -16,7 +17,7 @@ import { ConversationBookingHandler } from './conversation-booking.handler';
 import { ConversationBookingRelationService } from './conversation-booking-relation.service';
 
 @Module({
-  imports: [AvailabilityModule],
+  imports: [AccountsModule, AvailabilityModule],
   controllers: [AppointmentsController, PublicAppointmentsController],
   providers: [
     AppointmentsService,

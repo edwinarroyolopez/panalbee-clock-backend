@@ -101,10 +101,11 @@ export class CreatePublicAppointmentDto {
 }
 
 export class PublicAppointmentListQueryDto {
+  @IsOptional()
   @IsString()
   @Length(40, 128)
   @Matches(/^[A-Za-z0-9_-]+$/)
-  managementToken!: string;
+  managementToken?: string;
 }
 
 export class CancelAppointmentDto {

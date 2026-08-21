@@ -6,7 +6,7 @@ import {
   uuidField,
 } from './schema-helpers';
 
-export type UserStatus = 'ACTIVE' | 'DISABLED';
+export type UserStatus = 'PENDING_ACTIVATION' | 'ACTIVE' | 'DISABLED';
 export type ActorType = 'TENANT' | 'INTERNAL';
 export type InternalRole = 'PLATFORM_ADMIN' | 'PLATFORM_SUPPORT';
 
@@ -32,7 +32,11 @@ export const UserSchema: Schema<UserEntity> = new Schema<UserEntity>(
       type: String,
       enum: ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'],
     },
-    status: { type: String, enum: ['ACTIVE', 'DISABLED'], default: 'ACTIVE' },
+    status: {
+      type: String,
+      enum: ['PENDING_ACTIVATION', 'ACTIVE', 'DISABLED'],
+      default: 'ACTIVE',
+    },
   },
   documentOptions<UserEntity>('users'),
 );

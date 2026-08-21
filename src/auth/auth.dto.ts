@@ -30,3 +30,10 @@ export class LoginDto {
   @MaxLength(120)
   tenantSlug?: string;
 }
+
+export class ExchangeDelegatedSessionDto {
+  @IsString()
+  @MinLength(20)
+  @MaxLength(200)
+  exchangeCode!: string;
+}

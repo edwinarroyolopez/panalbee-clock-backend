@@ -79,6 +79,17 @@ export class BackofficeService {
       if (!existing) {
         throw new AppException(404, 'TENANT_NOT_FOUND', 'Tenant not found');
       }
+      const managedAccount = await this.database.models.account
+        .exists({ tenantId })
+        .session(session)
+        .exec();
+      if (managedAccount) {
+        throw new AppException(
+          409,
+          'ACCOUNT_STATUS_REQUIRED',
+          'Managed tenant status must be changed through its account',
+        );
+      }
       const updated = await this.database.models.tenant
         .findOneAndUpdate(
           { _id: tenantId },

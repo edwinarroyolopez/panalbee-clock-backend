@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DelegatedSessionService } from '../accounts/delegated-session.service';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -36,6 +37,7 @@ export class AuthService {
   constructor(
     private readonly database: DatabaseService,
     private readonly tokens: TokenService,
+    private readonly delegatedSessions: DelegatedSessionService,
   ) {}
 
   async login(dto: LoginDto): Promise<LoginResult> {
@@ -76,11 +78,55 @@ export class AuthService {
     };
   }
 
-  async authenticate(token: string): Promise<AuthContext> {
+  async exchangeDelegated(exchangeCode: string): Promise<LoginResult> {
+    const exchanged = await this.delegatedSessions.exchange(exchangeCode);
+    const accessToken = await this.tokens.issue(
+      {
+        userId: exchanged.context.userId,
+        actorType: 'DELEGATED',
+        tenantId: exchanged.context.tenant.id,
+        delegatedSessionId: exchanged.context.delegatedSession.id,
+      },
+      exchanged.expiresAt,
+    );
+    return {
+      accessToken,
+      expiresIn: Math.min(
+        this.tokens.expiresInSeconds,
+        Math.max(
+          1,
+          Math.floor((exchanged.expiresAt.getTime() - Date.now()) / 1000),
+        ),
+      ),
+      user: exchanged.context,
+    };
+  }
+
+  async authenticate(token: string, requestId?: string): Promise<AuthContext> {
     const claims = await this.tokens.verify(token);
-    return claims.actorType === 'TENANT'
-      ? this.authenticateTenant(claims)
-      : this.authenticateInternal(claims);
+    if (claims.actorType === 'TENANT') return this.authenticateTenant(claims);
+    if (claims.actorType === 'DELEGATED') {
+      return this.delegatedSessions.authenticateSession(claims, requestId);
+    }
+    return this.authenticateInternal(claims);
+  }
+
+  endDelegated(
+    actor: AuthContext,
+    requestId: string,
+  ): Promise<{ id: string; status: string; expiresAt: Date }> {
+    if (actor.actorType !== 'DELEGATED') {
+      throw new AppException(
+        403,
+        'DELEGATED_SESSION_REQUIRED',
+        'A delegated session is required',
+      );
+    }
+    return this.delegatedSessions.revoke(
+      actor.delegatedSession.id,
+      actor.userId,
+      requestId,
+    );
   }
 
   private internalLoginContext(

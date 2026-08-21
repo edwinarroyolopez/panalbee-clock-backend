@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { AccountPublicAccessService } from '../accounts/account-public-access.service';
+import type { TenantOperationAuthContext } from '../auth/auth.types';
 import { AvailabilityService } from '../availability/availability.service';
-import { AppException } from '../common/app-exception';
 import { Environment } from '../config/environment';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -36,6 +37,7 @@ export class AppointmentsService {
     private readonly effects: AppointmentEffectsService,
     private readonly intervalLocks: AppointmentIntervalLockService,
     private readonly config: ConfigService<Environment, true>,
+    private readonly publicAccess: AccountPublicAccessService,
   ) {}
 
   async list(
@@ -65,17 +67,18 @@ export class AppointmentsService {
   }
 
   async createTenant(
-    tenantId: string,
-    actorUserId: string,
+    actor: TenantOperationAuthContext,
     dto: CreateTenantAppointmentDto,
   ): Promise<AppointmentView> {
     const normalized = normalizeCommon(dto);
     return this.create({
-      tenantId,
+      tenantId: actor.tenant.id,
       ...normalized,
       customerId: dto.customerId,
       source: 'ADMIN',
-      actorUserId,
+      actorUserId: actor.userId,
+      actorType:
+        actor.actorType === 'DELEGATED' ? 'INTERNAL_USER' : 'TENANT_USER',
       publicOnly: false,
       fingerprint: fingerprint({ ...normalized, customerId: dto.customerId }),
     });
@@ -85,13 +88,9 @@ export class AppointmentsService {
     tenantSlug: string,
     dto: CreatePublicAppointmentDto,
   ): Promise<PublicAppointmentResult> {
-    const tenant = await this.database.models.tenant
-      .findOne({ slug: tenantSlug, status: 'ACTIVE' })
-      .lean()
-      .exec();
-    if (!tenant) {
-      throw new AppException(404, 'TENANT_NOT_FOUND', 'Tenant not found');
-    }
+    const { tenant } = await this.publicAccess.resolve(tenantSlug, {
+      requireBooking: true,
+    });
     const normalized = normalizeCommon(dto);
     const publicCustomer = {
       name: dto.customerName.trim(),
@@ -104,14 +103,24 @@ export class AppointmentsService {
       publicCustomer,
       source: 'WEB',
       actorUserId: null,
+      actorType: 'CUSTOMER',
       publicOnly: true,
       fingerprint: fingerprint({ ...normalized, ...publicCustomer }),
     });
   }
 
-  private async create(intent: CreateIntent): Promise<PublicAppointmentResult> {
+  private async create(
+    intent: CreateIntent,
+    retryCustomerConflict = true,
+  ): Promise<PublicAppointmentResult> {
     try {
       return await this.database.withTransaction(async (session) => {
+        if (intent.publicOnly) {
+          await this.publicAccess.assertTenantBookingEnabled(
+            intent.tenantId,
+            session,
+          );
+        }
         const replay = await this.store.findReplay(intent, session);
         if (replay) return this.withManagementToken(replay, intent);
 
@@ -181,7 +190,7 @@ export class AppointmentsService {
           session,
           intent.tenantId,
           intent.actorUserId,
-          Boolean(intent.publicCustomer),
+          intent.actorType,
           appointment,
         );
         return {
@@ -190,6 +199,12 @@ export class AppointmentsService {
         };
       });
     } catch (error) {
+      if (
+        retryCustomerConflict &&
+        isNamedDuplicateKey(error, INDEX_NAMES.customerPhone)
+      ) {
+        return this.create(intent, false);
+      }
       if (isNamedDuplicateKey(error, INDEX_NAMES.appointmentIdempotency)) {
         const replay = await this.store.findReplay(intent);
         if (replay) return this.withManagementToken(replay, intent);

@@ -1,10 +1,13 @@
 import { INestApplication, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Server } from 'node:http';
 import request from 'supertest';
+import { AccountsModule } from '../src/accounts/accounts.module';
 import { AppointmentsModule } from '../src/appointments/appointments.module';
+import { AuditModule } from '../src/audit/audit.module';
+import { DelegatedActionAuditInterceptor } from '../src/audit/delegated-action-audit.interceptor';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import { AuthModule } from '../src/auth/auth.module';
 import { AuthorityGuard } from '../src/auth/authority.guard';
@@ -30,6 +33,8 @@ export const testPassword = 'correct-password';
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    AuditModule,
+    AccountsModule,
     AuthModule,
     TenantsModule,
     CustomersModule,
@@ -42,6 +47,10 @@ export const testPassword = 'correct-password';
   providers: [
     { provide: APP_GUARD, useClass: AccessTokenGuard },
     { provide: APP_GUARD, useClass: AuthorityGuard },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DelegatedActionAuditInterceptor,
+    },
   ],
 })
 class BookingAvailabilityTestModule {}

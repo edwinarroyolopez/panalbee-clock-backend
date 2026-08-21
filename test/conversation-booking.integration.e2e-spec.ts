@@ -78,7 +78,7 @@ describe('conversation to booking vertical (MongoDB integration)', () => {
       { type: 'interactive' as const, id: 'book', title: 'Book' },
       { type: 'text' as const, text: ids.service },
       { type: 'text' as const, text: ids.staff },
-      { type: 'text' as const, text: '2026-08-21' },
+      { type: 'text' as const, text: '2099-08-21' },
       { type: 'text' as const, text: '10:00' },
       { type: 'text' as const, text: 'Andrea Lopez' },
       { type: 'interactive' as const, id: 'confirm', title: 'Confirm' },
@@ -111,7 +111,7 @@ describe('conversation to booking vertical (MongoDB integration)', () => {
     expect(appointment).toMatchObject({
       status: 'CONFIRMED',
       sourceChannel: 'WHATSAPP',
-      startsAt: new Date('2026-08-21T15:00:00.000Z'),
+      startsAt: new Date('2099-08-21T15:00:00.000Z'),
     });
     expect(conversation?.state).toBe('MAIN_MENU');
     expect(

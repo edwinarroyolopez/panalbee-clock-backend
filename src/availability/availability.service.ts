@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime, IANAZone } from 'luxon';
 import { ClientSession } from 'mongoose';
+import { AccountPublicAccessService } from '../accounts/account-public-access.service';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import { AvailabilityQueryDto } from './availability.dto';
@@ -21,7 +22,10 @@ interface ComputeOptions {
 
 @Injectable()
 export class AvailabilityService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly publicAccess: AccountPublicAccessService,
+  ) {}
 
   async listForTenant(
     tenantId: string,
@@ -34,13 +38,9 @@ export class AvailabilityService {
     tenantSlug: string,
     query: AvailabilityQueryDto,
   ): Promise<{ items: AvailabilitySlot[] }> {
-    const tenant = await this.database.models.tenant
-      .findOne({ slug: tenantSlug, status: 'ACTIVE' })
-      .lean()
-      .exec();
-    if (!tenant) {
-      throw new AppException(404, 'TENANT_NOT_FOUND', 'Tenant not found');
-    }
+    const { tenant } = await this.publicAccess.resolve(tenantSlug, {
+      requireBooking: true,
+    });
     return {
       items: await this.compute(tenant._id, query, { publicOnly: true }),
     };
@@ -53,6 +53,9 @@ export class AvailabilityService {
     options: ComputeOptions = {},
   ): Promise<void> {
     const requested = new Date(startsAt).getTime();
+    if (Number.isFinite(requested) && requested <= Date.now()) {
+      throw appointmentStartsAtPast();
+    }
     const slots = await this.compute(tenantId, query, options);
     if (hasRequestedSlot(slots, requested)) return;
 
@@ -203,6 +206,7 @@ export class AvailabilityService {
           .lean()
           .exec();
 
+    const now = Date.now();
     return buildAvailabilitySlots({
       date: query.date,
       timezone: location.timezone,
@@ -210,8 +214,16 @@ export class AvailabilityService {
       schedules,
       exceptions,
       appointments,
-    });
+    }).filter(({ startsAt }) => new Date(startsAt).getTime() > now);
   }
+}
+
+function appointmentStartsAtPast(): AppException {
+  return new AppException(
+    409,
+    'APPOINTMENT_STARTS_AT_PAST',
+    'Appointment start time must be in the future',
+  );
 }
 
 function hasRequestedSlot(

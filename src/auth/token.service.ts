@@ -11,6 +11,7 @@ export interface VerifiedAccessToken {
   userId: string;
   actorType: ActorType;
   tenantId?: string;
+  delegatedSessionId?: string;
 }
 
 @Injectable()
@@ -31,18 +32,36 @@ export class TokenService {
     });
   }
 
-  async issue(claims: VerifiedAccessToken): Promise<string> {
+  async issue(
+    claims: VerifiedAccessToken,
+    maximumExpiresAt?: Date,
+  ): Promise<string> {
     const { SignJWT } = await import('jose');
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const defaultExpiry = issuedAt + this.expiresInSeconds;
+    const expiration = maximumExpiresAt
+      ? Math.min(defaultExpiry, Math.floor(maximumExpiresAt.getTime() / 1000))
+      : defaultExpiry;
+    if (expiration <= issuedAt) {
+      throw new AppException(
+        401,
+        'ACCESS_TOKEN_INVALID',
+        'Access token is invalid or expired',
+      );
+    }
     return new SignJWT({
       actorType: claims.actorType,
       ...(claims.tenantId ? { tenantId: claims.tenantId } : {}),
+      ...(claims.delegatedSessionId
+        ? { delegatedSessionId: claims.delegatedSessionId }
+        : {}),
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setSubject(claims.userId)
       .setIssuer(this.issuer)
       .setAudience(this.audience)
-      .setIssuedAt()
-      .setExpirationTime(`${this.expiresInSeconds}s`)
+      .setIssuedAt(issuedAt)
+      .setExpirationTime(expiration)
       .sign(this.key);
   }
 
@@ -58,14 +77,25 @@ export class TokenService {
       });
       const actorType = payload.actorType;
       const tenantId = payload.tenantId;
+      const delegatedSessionId = payload.delegatedSessionId;
 
       if (
         !payload.sub ||
         !UUID.test(payload.sub) ||
-        (actorType !== 'TENANT' && actorType !== 'INTERNAL') ||
+        (actorType !== 'TENANT' &&
+          actorType !== 'INTERNAL' &&
+          actorType !== 'DELEGATED') ||
         (actorType === 'TENANT' &&
-          (typeof tenantId !== 'string' || !UUID.test(tenantId))) ||
-        (actorType === 'INTERNAL' && tenantId !== undefined)
+          (typeof tenantId !== 'string' ||
+            !UUID.test(tenantId) ||
+            delegatedSessionId !== undefined)) ||
+        (actorType === 'INTERNAL' &&
+          (tenantId !== undefined || delegatedSessionId !== undefined)) ||
+        (actorType === 'DELEGATED' &&
+          (typeof tenantId !== 'string' ||
+            !UUID.test(tenantId) ||
+            typeof delegatedSessionId !== 'string' ||
+            !UUID.test(delegatedSessionId)))
       ) {
         throw new Error('Invalid claims');
       }
@@ -74,6 +104,9 @@ export class TokenService {
         userId: payload.sub,
         actorType,
         ...(typeof tenantId === 'string' ? { tenantId } : {}),
+        ...(typeof delegatedSessionId === 'string'
+          ? { delegatedSessionId }
+          : {}),
       };
     } catch {
       throw new AppException(

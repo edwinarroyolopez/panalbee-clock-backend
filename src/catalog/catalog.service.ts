@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AccountPublicAccessService } from '../accounts/account-public-access.service';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -20,7 +21,10 @@ export interface ServiceView {
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly publicAccess: AccountPublicAccessService,
+  ) {}
 
   async list(tenantId: string): Promise<{ items: ServiceView[] }> {
     const services = await this.database.models.service
@@ -32,13 +36,7 @@ export class CatalogService {
   }
 
   async listPublic(tenantSlug: string): Promise<{ items: ServiceView[] }> {
-    const tenant = await this.database.models.tenant
-      .findOne({ slug: tenantSlug, status: 'ACTIVE' })
-      .lean()
-      .exec();
-    if (!tenant) {
-      throw new AppException(404, 'TENANT_NOT_FOUND', 'Tenant not found');
-    }
+    const { tenant } = await this.publicAccess.resolve(tenantSlug);
     const services = await this.database.models.service
       .find({ tenantId: tenant._id, active: true })
       .sort({ name: 1, _id: 1 })
