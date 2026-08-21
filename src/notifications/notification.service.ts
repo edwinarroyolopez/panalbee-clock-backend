@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ClientSession } from 'mongoose';
-import { ChannelType, ReplyIntent } from '../channels/channel-adapter';
-import { ChannelAdapterRegistry } from '../channels/channel-adapter.registry';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -12,22 +10,15 @@ import {
 import {
   CreateNotificationIntent,
   NotificationProcessingSummary,
-  NotificationType,
   NotificationView,
 } from './notification.types';
-
-interface NotificationDestination {
-  channelType: ChannelType;
-  externalAccountId: string;
-  recipientId: string;
-  customerName: string;
-}
+import { NotificationDeliveryService } from './notification-delivery.service';
 
 @Injectable()
 export class NotificationService {
   constructor(
     private readonly database: DatabaseService,
-    private readonly adapters: ChannelAdapterRegistry,
+    private readonly delivery: NotificationDeliveryService,
   ) {}
 
   async createIntent(
@@ -105,9 +96,24 @@ export class NotificationService {
     return { sent, failed };
   }
 
+  async processOne(
+    tenantId: string,
+    notificationId: string,
+  ): Promise<NotificationView> {
+    const claimed = await this.claimOne(5, tenantId, notificationId);
+    if (claimed) await this.dispatch(claimed);
+    const notification = await this.database.models.notification
+      .findOne({ _id: notificationId, tenantId })
+      .lean()
+      .exec();
+    if (!notification) throw new Error('Notification does not exist');
+    return this.view(notification);
+  }
+
   private claimOne(
     maxAttempts: number,
     tenantId?: string,
+    notificationId?: string,
   ): Promise<NotificationEntity | null> {
     const now = new Date();
     return this.database.models.notification
@@ -116,6 +122,7 @@ export class NotificationService {
           scheduledFor: { $lte: now },
           attempts: { $lt: maxAttempts },
           ...(tenantId ? { tenantId } : {}),
+          ...(notificationId ? { _id: notificationId } : {}),
           $or: [
             { status: { $in: ['PENDING', 'FAILED'] } },
             {
@@ -144,13 +151,7 @@ export class NotificationService {
 
   private async dispatch(notification: NotificationEntity): Promise<boolean> {
     try {
-      const destination = await this.destination(notification);
-      const delivery = await this.adapters.get(destination.channelType).send({
-        externalAccountId: destination.externalAccountId,
-        recipientId: destination.recipientId,
-        intent: this.intent(notification.type, destination.customerName),
-        idempotencyKey: notification.idempotencyKey,
-      });
+      const providerMessageId = await this.delivery.send(notification);
       return await this.database.withTransaction(async (session) => {
         const updated = await this.database.models.notification
           .findOneAndUpdate(
@@ -177,7 +178,7 @@ export class NotificationService {
               action: 'NOTIFICATION_SENT',
               entityType: 'notification',
               entityId: notification._id,
-              metadata: { providerMessageId: delivery.providerMessageId },
+              metadata: { providerMessageId },
             },
           ],
           { session },
@@ -195,7 +196,7 @@ export class NotificationService {
         {
           $set: {
             status: 'FAILED',
-            lastErrorCode: this.safeErrorCode(error),
+            lastErrorCode: safeErrorCode(error),
           },
           $unset: { leaseUntil: 1 },
         },
@@ -203,69 +204,6 @@ export class NotificationService {
       );
       return false;
     }
-  }
-
-  private async destination(
-    notification: NotificationEntity,
-  ): Promise<NotificationDestination> {
-    const [tenant, channel, customer] = await Promise.all([
-      this.database.models.tenant
-        .exists({ _id: notification.tenantId, status: 'ACTIVE' })
-        .exec(),
-      notification.channelId
-        ? this.database.models.channel
-            .findOne({
-              _id: notification.channelId,
-              tenantId: notification.tenantId,
-              status: 'ACTIVE',
-            })
-            .lean()
-            .exec()
-        : null,
-      this.database.models.customer
-        .findOne({
-          _id: notification.customerId,
-          tenantId: notification.tenantId,
-          phone: { $type: 'string' },
-        })
-        .lean()
-        .exec(),
-    ]);
-    if (!tenant || !channel || !customer?.phone) {
-      throw new AppException(
-        409,
-        'NOTIFICATION_DESTINATION_UNAVAILABLE',
-        'Notification destination is unavailable',
-      );
-    }
-    return {
-      channelType: channel.type,
-      externalAccountId: channel.externalAccountId,
-      recipientId: customer.phone,
-      customerName: customer.fullName,
-    };
-  }
-
-  private intent(type: NotificationType, customerName: string): ReplyIntent {
-    const names: Record<NotificationType, string> = {
-      BOOKING_CONFIRMATION: 'booking_confirmation',
-      BOOKING_REMINDER: 'booking_reminder',
-      BOOKING_RESCHEDULED: 'booking_rescheduled',
-      BOOKING_CANCELLED: 'booking_cancelled',
-    };
-    return {
-      kind: 'TEMPLATE',
-      name: names[type],
-      language: 'en',
-      variables: [customerName],
-    };
-  }
-
-  private safeErrorCode(error: unknown): string {
-    return error instanceof AppException &&
-      /^[A-Z0-9_]{1,80}$/.test(error.reasonCode)
-      ? error.reasonCode
-      : 'CHANNEL_DELIVERY_UNAVAILABLE';
   }
 
   private sameIntent(
@@ -296,4 +234,11 @@ export class NotificationService {
       lastErrorCode: notification.lastErrorCode ?? null,
     };
   }
+}
+
+function safeErrorCode(error: unknown): string {
+  return error instanceof AppException &&
+    /^[A-Z0-9_]{1,80}$/.test(error.reasonCode)
+    ? error.reasonCode
+    : 'CHANNEL_DELIVERY_UNAVAILABLE';
 }

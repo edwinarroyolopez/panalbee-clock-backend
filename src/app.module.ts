@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AccountsModule } from './accounts/accounts.module';
 import { AuditModule } from './audit/audit.module';
+import { DelegatedActionAuditInterceptor } from './audit/delegated-action-audit.interceptor';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AccessTokenGuard } from './auth/access-token.guard';
 import { AuthModule } from './auth/auth.module';
@@ -27,6 +29,7 @@ import { CustomersModule } from './customers/customers.module';
     }),
     DatabaseModule,
     AuditModule,
+    AccountsModule,
     AuthModule,
     HealthModule,
     TenantsModule,
@@ -42,6 +45,10 @@ import { CustomersModule } from './customers/customers.module';
   providers: [
     { provide: APP_GUARD, useClass: AccessTokenGuard },
     { provide: APP_GUARD, useClass: AuthorityGuard },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DelegatedActionAuditInterceptor,
+    },
   ],
 })
 export class AppModule {}

@@ -6,7 +6,7 @@ export type TenantRole = (typeof TENANT_ROLES)[number];
 export const INTERNAL_ROLES = ['PLATFORM_ADMIN', 'PLATFORM_SUPPORT'] as const;
 export type InternalRole = (typeof INTERNAL_ROLES)[number];
 
-export type ActorType = 'TENANT' | 'INTERNAL';
+export type ActorType = 'TENANT' | 'INTERNAL' | 'DELEGATED';
 
 interface BaseAuthContext {
   userId: string;
@@ -30,7 +30,27 @@ export interface InternalAuthContext extends BaseAuthContext {
   internalRole: InternalRole;
 }
 
-export type AuthContext = TenantAuthContext | InternalAuthContext;
+export interface DelegatedAuthContext extends BaseAuthContext {
+  actorType: 'DELEGATED';
+  internalRole: 'PLATFORM_ADMIN';
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  tenantRole: 'OWNER';
+  effectiveTenantRole: 'OWNER';
+  delegatedSession: {
+    id: string;
+    reason: string;
+    expiresAt: Date;
+  };
+}
+
+export type TenantOperationAuthContext =
+  TenantAuthContext | DelegatedAuthContext;
+
+export type AuthContext = TenantOperationAuthContext | InternalAuthContext;
 
 export interface AuthenticatedRequest extends RequestWithId {
   auth: AuthContext;

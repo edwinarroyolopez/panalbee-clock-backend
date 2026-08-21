@@ -1,9 +1,12 @@
 import { INestApplication, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Server } from 'node:http';
+import { AccountsModule } from '../src/accounts/accounts.module';
 import { AuditModule } from '../src/audit/audit.module';
+import { DelegatedActionAuditInterceptor } from '../src/audit/delegated-action-audit.interceptor';
+import { AppointmentsModule } from '../src/appointments/appointments.module';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import { AuthModule } from '../src/auth/auth.module';
 import { AuthorityGuard } from '../src/auth/authority.guard';
@@ -28,6 +31,8 @@ import { TenantsModule } from '../src/tenants/tenants.module';
     }),
     DatabaseModule,
     AuditModule,
+    AccountsModule,
+    AppointmentsModule,
     AuthModule,
     HealthModule,
     TenantsModule,
@@ -40,6 +45,10 @@ import { TenantsModule } from '../src/tenants/tenants.module';
   providers: [
     { provide: APP_GUARD, useClass: AccessTokenGuard },
     { provide: APP_GUARD, useClass: AuthorityGuard },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DelegatedActionAuditInterceptor,
+    },
   ],
 })
 class CoreTestModule {}

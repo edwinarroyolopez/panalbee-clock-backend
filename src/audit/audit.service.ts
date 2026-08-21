@@ -51,6 +51,19 @@ export interface SensitiveAuditEvent {
   metadata?: Record<string, unknown>;
 }
 
+export interface AuditRecord {
+  tenantId?: string;
+  actorUserId?: string;
+  actorType:
+    'TENANT_USER' | 'INTERNAL_USER' | 'CUSTOMER' | 'SYSTEM' | 'CHANNEL';
+  action: string;
+  entityType: string;
+  entityId: string;
+  reason?: string;
+  requestId?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export function validateAuditReason(value: string): string {
   const reason = value.trim();
   if (reason.length < 6 || reason.length > 500) {
@@ -73,15 +86,26 @@ export class AuditService {
   ): Promise<void> {
     const reason = validateAuditReason(event.reason);
 
+    await this.record(
+      {
+        ...event,
+        actorType: 'INTERNAL_USER',
+        reason,
+      },
+      session,
+    );
+  }
+
+  async record(event: AuditRecord, session?: ClientSession): Promise<void> {
     const auditEvent = new this.database.models.auditEvent({
-      tenantId: event.tenantId,
-      actorUserId: event.actorUserId,
-      actorType: 'INTERNAL_USER',
+      ...(event.tenantId ? { tenantId: event.tenantId } : {}),
+      ...(event.actorUserId ? { actorUserId: event.actorUserId } : {}),
+      actorType: event.actorType,
       action: event.action,
       entityType: event.entityType,
       entityId: event.entityId,
-      reason,
-      requestId: event.requestId,
+      ...(event.reason ? { reason: event.reason } : {}),
+      ...(event.requestId ? { requestId: event.requestId } : {}),
       metadata: sanitizeAuditMetadata(event.metadata ?? {}),
     });
     await auditEvent.save({ session });

@@ -1,5 +1,7 @@
 import request from 'supertest';
+import { DateTime } from 'luxon';
 import {
+  login,
   seedTenant,
   startTestApp,
   stopTestApp,
@@ -34,6 +36,7 @@ interface Slot {
 
 describe('availability computation (integration e2e)', () => {
   let testApp: TestApp;
+  let token: string;
 
   beforeAll(async () => {
     testApp = await startTestApp();
@@ -64,6 +67,7 @@ describe('availability computation (integration e2e)', () => {
       scheduleStart: '09:00',
       scheduleEnd: '10:00',
     });
+    token = await login(testApp.server, 'availability-bogota@example.test');
   });
 
   afterAll(async () => stopTestApp(testApp));
@@ -111,19 +115,19 @@ describe('availability computation (integration e2e)', () => {
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-24',
+      '2099-08-24',
     ).expect(200);
     const slots = (response.body as { items: Slot[] }).items;
 
     expect(slots).toHaveLength(5);
     expect(slots[0]).toMatchObject({
-      startsAt: '2026-08-24T14:00:00.000Z',
-      endsAt: '2026-08-24T15:00:00.000Z',
-      localStartsAt: '2026-08-24T09:00',
-      localEndsAt: '2026-08-24T10:00',
+      startsAt: '2099-08-24T14:00:00.000Z',
+      endsAt: '2099-08-24T15:00:00.000Z',
+      localStartsAt: '2099-08-24T09:00',
+      localEndsAt: '2099-08-24T10:00',
       durationMinutes: 60,
     });
-    expect(slots.at(-1)?.localStartsAt).toBe('2026-08-24T10:00');
+    expect(slots.at(-1)?.localStartsAt).toBe('2099-08-24T10:00');
   });
 
   it('honors staff duration overrides and requires the full interval', async () => {
@@ -140,13 +144,13 @@ describe('availability computation (integration e2e)', () => {
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-27',
+      '2099-08-27',
     ).expect(200);
     const slots = (response.body as { items: Slot[] }).items;
 
     expect(slots).toHaveLength(6);
     expect(slots[0].durationMinutes).toBe(45);
-    expect(slots.at(-1)?.localEndsAt).toBe('2026-08-27T11:00');
+    expect(slots.at(-1)?.localEndsAt).toBe('2099-08-27T11:00');
     await testApp.database.models.staffService.updateOne(
       {
         tenantId: ids.tenant,
@@ -163,20 +167,20 @@ describe('availability computation (integration e2e)', () => {
       locationId: ids.location,
       staffId: ids.staff,
       kind: 'UNAVAILABLE',
-      startsAt: new Date('2026-08-25T14:30:00Z'),
-      endsAt: new Date('2026-08-25T15:00:00Z'),
+      startsAt: new Date('2099-08-25T14:30:00Z'),
+      endsAt: new Date('2099-08-25T15:00:00Z'),
     });
     const response = await publicAvailability(
       'availability-bogota',
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-25',
+      '2099-08-25',
     ).expect(200);
     const slots = (response.body as { items: Slot[] }).items;
 
     expect(slots.map((slot) => slot.localStartsAt)).toEqual([
-      '2026-08-25T10:00',
+      '2099-08-25T10:00',
     ]);
   });
 
@@ -188,8 +192,8 @@ describe('availability computation (integration e2e)', () => {
       serviceId: ids.service,
       staffId: ids.staff,
       customerId: ids.customer,
-      startsAt: new Date('2026-08-26T14:00:00Z'),
-      endsAt: new Date('2026-08-26T15:00:00Z'),
+      startsAt: new Date('2099-08-26T14:00:00Z'),
+      endsAt: new Date('2099-08-26T15:00:00Z'),
       idempotencyKey: 'availability-existing',
       requestFingerprint: 'x',
     });
@@ -198,11 +202,11 @@ describe('availability computation (integration e2e)', () => {
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-26',
+      '2099-08-26',
     ).expect(200);
 
     expect((response.body as { items: Slot[] }).items).toEqual([
-      expect.objectContaining({ startsAt: '2026-08-26T15:00:00.000Z' }),
+      expect.objectContaining({ startsAt: '2099-08-26T15:00:00.000Z' }),
     ]);
   });
 
@@ -212,15 +216,15 @@ describe('availability computation (integration e2e)', () => {
       ids.nyLocation,
       ids.nyService,
       ids.nyStaff,
-      '2026-07-02',
+      '2099-07-02',
     ).expect(200);
     const slot = (response.body as { items: Slot[] }).items[0];
 
     expect(slot).toMatchObject({
-      startsAt: '2026-07-02T13:00:00.000Z',
-      endsAt: '2026-07-02T14:00:00.000Z',
-      localStartsAt: '2026-07-02T09:00',
-      localEndsAt: '2026-07-02T10:00',
+      startsAt: '2099-07-02T13:00:00.000Z',
+      endsAt: '2099-07-02T14:00:00.000Z',
+      localStartsAt: '2099-07-02T09:00',
+      localEndsAt: '2099-07-02T10:00',
       timezone: 'America/New_York',
     });
   });
@@ -231,10 +235,10 @@ describe('availability computation (integration e2e)', () => {
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-23',
+      '2099-08-23',
     ).expect(200);
     expect((sunday.body as { items: Slot[] }).items[0].localStartsAt).toBe(
-      '2026-08-23T09:00',
+      '2099-08-23T09:00',
     );
 
     await testApp.database.models.schedule.deleteMany({
@@ -247,15 +251,15 @@ describe('availability computation (integration e2e)', () => {
       locationId: ids.location,
       staffId: ids.staff,
       kind: 'AVAILABLE',
-      startsAt: new Date('2026-08-28T14:00:00Z'),
-      endsAt: new Date('2026-08-28T16:00:00Z'),
+      startsAt: new Date('2099-08-28T14:00:00Z'),
+      endsAt: new Date('2099-08-28T16:00:00Z'),
     });
     const available = await publicAvailability(
       'availability-bogota',
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-28',
+      '2099-08-28',
     ).expect(200);
     expect((available.body as { items: Slot[] }).items).toHaveLength(5);
   });
@@ -274,19 +278,69 @@ describe('availability computation (integration e2e)', () => {
       ids.nyLocation,
       ids.nyService,
       ids.nyStaff,
-      '2026-03-08',
+      '2099-03-08',
     ).expect(200);
     const transitionSlots = (response.body as { items: Slot[] }).items.filter(
-      (slot) => slot.localStartsAt < '2026-03-08T04:00',
+      (slot) => slot.localStartsAt < '2099-03-08T04:00',
     );
     expect(transitionSlots.map((slot) => slot.localStartsAt)).toEqual([
-      '2026-03-08T01:00',
-      '2026-03-08T01:15',
-      '2026-03-08T01:30',
-      '2026-03-08T01:45',
-      '2026-03-08T03:00',
+      '2099-03-08T01:00',
+      '2099-03-08T01:15',
+      '2099-03-08T01:30',
+      '2099-03-08T01:45',
+      '2099-03-08T03:00',
     ]);
-    expect(transitionSlots.at(-1)?.endsAt).toBe('2026-03-08T08:00:00.000Z');
+    expect(transitionSlots.at(-1)?.endsAt).toBe('2099-03-08T08:00:00.000Z');
+  });
+
+  it('returns only starts after the system clock for public and admin reads', async () => {
+    const localNow = DateTime.now().setZone('America/Bogota');
+    const yesterday = localNow.minus({ days: 1 }).toISODate()!;
+    const today = localNow.toISODate()!;
+    const query = {
+      locationId: ids.location,
+      serviceId: ids.service,
+      staffId: ids.staff,
+    };
+
+    await publicAvailability(
+      'availability-bogota',
+      ids.location,
+      ids.service,
+      ids.staff,
+      yesterday,
+    )
+      .expect(200)
+      .expect({ items: [] });
+    await request(testApp.server)
+      .get('/api/v1/availability')
+      .auth(token, { type: 'bearer' })
+      .query({ ...query, date: yesterday })
+      .expect(200)
+      .expect({ items: [] });
+
+    const beforeRequests = Date.now();
+    for (const response of [
+      await publicAvailability(
+        'availability-bogota',
+        ids.location,
+        ids.service,
+        ids.staff,
+        today,
+      ).expect(200),
+      await request(testApp.server)
+        .get('/api/v1/availability')
+        .auth(token, { type: 'bearer' })
+        .query({ ...query, date: today })
+        .expect(200),
+    ]) {
+      const slots = (response.body as { items: Slot[] }).items;
+      expect(
+        slots.every(({ startsAt }) =>
+          Boolean(new Date(startsAt).getTime() > beforeRequests),
+        ),
+      ).toBe(true);
+    }
   });
 
   it('rejects a non-IANA location timezone', async () => {
@@ -299,7 +353,7 @@ describe('availability computation (integration e2e)', () => {
       ids.location,
       ids.service,
       ids.staff,
-      '2026-08-24',
+      '2099-08-24',
     )
       .expect(422)
       .expect(({ body }: { body: { reasonCode: string } }) =>

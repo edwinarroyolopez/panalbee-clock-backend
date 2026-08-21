@@ -7,7 +7,7 @@ import { AppointmentEntity } from '../database/models';
 interface LifecycleActor {
   tenantId: string;
   actorUserId: string | null;
-  actorType: 'TENANT_USER' | 'CUSTOMER';
+  actorType: 'TENANT_USER' | 'INTERNAL_USER' | 'CUSTOMER';
 }
 
 @Injectable()
@@ -18,7 +18,7 @@ export class AppointmentEffectsService {
     session: ClientSession,
     tenantId: string,
     actorUserId: string | null,
-    publicCustomer: boolean,
+    actorType: LifecycleActor['actorType'],
     appointment: AppointmentEntity,
   ): Promise<void> {
     await this.database.models.notification.create(
@@ -39,7 +39,7 @@ export class AppointmentEffectsService {
         {
           tenantId,
           ...(actorUserId ? { actorUserId } : {}),
-          actorType: publicCustomer ? 'CUSTOMER' : 'TENANT_USER',
+          actorType,
           action: 'APPOINTMENT_CREATED',
           entityType: 'appointment',
           entityId: appointment._id,
@@ -78,6 +78,8 @@ export class AppointmentEffectsService {
             scheduledFor: new Date(),
             status: 'PENDING',
             attempts: 0,
+            ...(reason ? { changeReason: reason } : {}),
+            appointmentStartsAt: appointment.startsAt,
             idempotencyKey: `appointment:${appointment._id}:${notificationType}:${effectTime}`,
           },
         },

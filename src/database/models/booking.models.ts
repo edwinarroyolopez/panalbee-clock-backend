@@ -42,6 +42,20 @@ export interface AppointmentIntervalLockEntity extends UuidEntity {
   createdAt: Date;
 }
 
+export interface CustomerAccessChallengeEntity extends TimestampedEntity {
+  tenantId: string;
+  phoneHash: string;
+  requestBucket: number;
+  requesterHash: string;
+  customerId?: string | null;
+  codeHash: string;
+  codeExpiresAt: Date;
+  expiresAt: Date;
+  attempts: number;
+  consumedAt?: Date | null;
+  sessionTokenHash?: string | null;
+}
+
 export type NotificationType =
   | 'BOOKING_CONFIRMATION'
   | 'BOOKING_REMINDER'
@@ -61,6 +75,8 @@ export interface NotificationEntity extends TimestampedEntity {
   status: NotificationStatus;
   attempts: number;
   idempotencyKey: string;
+  changeReason?: string | null;
+  appointmentStartsAt?: Date | null;
   lastErrorCode?: string | null;
   leaseUntil?: Date | null;
 }
@@ -131,6 +147,66 @@ AppointmentIntervalLockSchema.index(
   { name: INDEX_NAMES.appointmentLockOwner },
 );
 
+export const CustomerAccessChallengeSchema: Schema<CustomerAccessChallengeEntity> =
+  new Schema<CustomerAccessChallengeEntity>(
+    {
+      _id: uuidField(),
+      tenantId: requiredUuidField(),
+      phoneHash: {
+        type: String,
+        required: true,
+        match: /^[0-9a-f]{64}$/,
+      },
+      requestBucket: { type: Number, required: true, min: 0 },
+      requesterHash: {
+        type: String,
+        required: true,
+        match: /^[0-9a-f]{64}$/,
+      },
+      customerId: optionalUuidField(),
+      codeHash: {
+        type: String,
+        required: true,
+        match: /^[0-9a-f]{64}$/,
+      },
+      codeExpiresAt: { type: Date, required: true },
+      expiresAt: { type: Date, required: true },
+      attempts: { type: Number, default: 0, min: 0, max: 5 },
+      consumedAt: { type: Date },
+      sessionTokenHash: {
+        type: String,
+        match: /^[0-9a-f]{64}$/,
+      },
+    },
+    documentOptions<CustomerAccessChallengeEntity>(
+      'customer_access_challenges',
+    ),
+  );
+CustomerAccessChallengeSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 0, name: INDEX_NAMES.customerAccessExpiry },
+);
+CustomerAccessChallengeSchema.index(
+  { tenantId: 1, phoneHash: 1, createdAt: -1 },
+  { name: INDEX_NAMES.customerAccessPhone },
+);
+CustomerAccessChallengeSchema.index(
+  { tenantId: 1, phoneHash: 1, requestBucket: 1 },
+  { unique: true, name: INDEX_NAMES.customerAccessPhoneBucket },
+);
+CustomerAccessChallengeSchema.index(
+  { tenantId: 1, requesterHash: 1, createdAt: -1 },
+  { name: INDEX_NAMES.customerAccessRequester },
+);
+CustomerAccessChallengeSchema.index(
+  { sessionTokenHash: 1 },
+  {
+    unique: true,
+    name: INDEX_NAMES.customerAccessSessionToken,
+    partialFilterExpression: { sessionTokenHash: { $type: 'string' } },
+  },
+);
+
 export const NotificationSchema: Schema<NotificationEntity> =
   new Schema<NotificationEntity>(
     {
@@ -157,6 +233,8 @@ export const NotificationSchema: Schema<NotificationEntity> =
       },
       attempts: { type: Number, default: 0, min: 0 },
       idempotencyKey: { type: String, required: true },
+      changeReason: { type: String, minlength: 2, maxlength: 500 },
+      appointmentStartsAt: { type: Date },
       lastErrorCode: { type: String },
       leaseUntil: { type: Date },
     },

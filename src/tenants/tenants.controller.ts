@@ -9,7 +9,7 @@ import {
 import { CurrentAuth, TenantRoles } from '../auth/auth.decorators';
 import { Public } from '../auth/auth.decorators';
 import { TENANT_ROLES } from '../auth/auth.types';
-import type { TenantAuthContext } from '../auth/auth.types';
+import type { TenantOperationAuthContext } from '../auth/auth.types';
 import { UpdateLocationDto } from './location.dto';
 import { TenantsService } from './tenants.service';
 import type {
@@ -24,7 +24,9 @@ export class TenantsController {
 
   @TenantRoles(...TENANT_ROLES)
   @Get('me')
-  current(@CurrentAuth() auth: TenantAuthContext): Promise<TenantView> {
+  current(
+    @CurrentAuth() auth: TenantOperationAuthContext,
+  ): Promise<TenantView> {
     return this.tenants.current(auth.tenant.id);
   }
 }
@@ -36,7 +38,7 @@ export class LocationsController {
   @TenantRoles(...TENANT_ROLES)
   @Get()
   locations(
-    @CurrentAuth() auth: TenantAuthContext,
+    @CurrentAuth() auth: TenantOperationAuthContext,
   ): Promise<{ items: LocationView[] }> {
     return this.tenants.locations(auth.tenant.id);
   }
@@ -44,7 +46,7 @@ export class LocationsController {
   @TenantRoles(...TENANT_ROLES)
   @Get(':locationId')
   location(
-    @CurrentAuth() auth: TenantAuthContext,
+    @CurrentAuth() auth: TenantOperationAuthContext,
     @Param('locationId', ParseUUIDPipe) locationId: string,
   ): Promise<LocationView> {
     return this.tenants.location(auth.tenant.id, locationId);
@@ -53,7 +55,7 @@ export class LocationsController {
   @TenantRoles('OWNER', 'MANAGER')
   @Patch(':locationId')
   updateLocation(
-    @CurrentAuth() auth: TenantAuthContext,
+    @CurrentAuth() auth: TenantOperationAuthContext,
     @Param('locationId', ParseUUIDPipe) locationId: string,
     @Body() dto: UpdateLocationDto,
   ): Promise<LocationView> {

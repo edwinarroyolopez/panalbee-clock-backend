@@ -2,6 +2,7 @@ import {
   AppointmentEntity,
   AppointmentSource,
   AppointmentStatus,
+  NotificationStatus,
 } from '../database/models';
 
 export interface AppointmentRecord extends AppointmentEntity {
@@ -37,6 +38,11 @@ export interface AppointmentView {
 
 export interface PublicAppointmentResult extends AppointmentView {
   managementToken?: string;
+}
+
+export interface TenantAppointmentLifecycleView extends AppointmentView {
+  notificationStatus: NotificationStatus;
+  notificationErrorCode: string | null;
 }
 
 export function appointmentView(

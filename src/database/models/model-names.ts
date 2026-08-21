@@ -1,4 +1,7 @@
 export const MODEL_NAMES = {
+  Account: 'Account',
+  AccountPublicProfile: 'AccountPublicProfile',
+  DelegatedSession: 'DelegatedSession',
   Tenant: 'Tenant',
   Location: 'Location',
   User: 'User',
@@ -11,6 +14,7 @@ export const MODEL_NAMES = {
   AvailabilityException: 'AvailabilityException',
   Appointment: 'Appointment',
   AppointmentIntervalLock: 'AppointmentIntervalLock',
+  CustomerAccessChallenge: 'CustomerAccessChallenge',
   Channel: 'Channel',
   Conversation: 'Conversation',
   ConversationStateHistory: 'ConversationStateHistory',
@@ -21,6 +25,12 @@ export const MODEL_NAMES = {
 } as const;
 
 export const INDEX_NAMES = {
+  accountSlug: 'account_slug_unique',
+  accountTenant: 'account_tenant_unique',
+  accountPublicProfile: 'account_public_profile_unique',
+  delegatedSessionExchangeCode: 'delegated_session_exchange_code_unique',
+  delegatedSessionTargetStatusExpiry:
+    'delegated_session_target_status_expiry_lookup',
   tenantSlug: 'tenant_slug_unique',
   locationOrdering: 'location_ordering',
   userEmail: 'user_email_lowercase_unique',
@@ -42,6 +52,11 @@ export const INDEX_NAMES = {
   appointmentCustomer: 'appointment_customer_lookup',
   appointmentIntervalLock: 'appointment_interval_lock_unique',
   appointmentLockOwner: 'appointment_interval_lock_owner',
+  customerAccessExpiry: 'customer_access_expiry_ttl',
+  customerAccessPhone: 'customer_access_phone_lookup',
+  customerAccessPhoneBucket: 'customer_access_phone_bucket_unique',
+  customerAccessRequester: 'customer_access_requester_lookup',
+  customerAccessSessionToken: 'customer_access_session_token_unique',
   channelExternalIdentity: 'channel_external_identity_unique',
   conversationExternalIdentity: 'conversation_external_identity_unique',
   conversationCustomer: 'conversation_customer_lookup',

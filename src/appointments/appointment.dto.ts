@@ -101,10 +101,23 @@ export class CreatePublicAppointmentDto {
 }
 
 export class PublicAppointmentListQueryDto {
+  @IsOptional()
   @IsString()
   @Length(40, 128)
   @Matches(/^[A-Za-z0-9_-]+$/)
-  managementToken!: string;
+  managementToken?: string;
+}
+
+export class RequestCustomerAccessCodeDto {
+  @IsString()
+  @Matches(/^\+[1-9]\d{6,14}$/)
+  phone!: string;
+}
+
+export class VerifyCustomerAccessCodeDto extends RequestCustomerAccessCodeDto {
+  @IsString()
+  @Matches(/^\d{6}$/)
+  code!: string;
 }
 
 export class CancelAppointmentDto {
@@ -124,6 +137,12 @@ export class RescheduleAppointmentDto {
   @IsISO8601({ strict: true })
   @Matches(/(?:Z|[+-]\d{2}:\d{2})$/)
   startsAt!: string;
+}
+
+export class TenantRescheduleAppointmentDto extends RescheduleAppointmentDto {
+  @IsString()
+  @Length(2, 500)
+  reason!: string;
 }
 
 export class PublicRescheduleAppointmentDto extends RescheduleAppointmentDto {
