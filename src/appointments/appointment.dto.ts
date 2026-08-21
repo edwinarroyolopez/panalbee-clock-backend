@@ -139,6 +139,12 @@ export class RescheduleAppointmentDto {
   startsAt!: string;
 }
 
+export class TenantRescheduleAppointmentDto extends RescheduleAppointmentDto {
+  @IsString()
+  @Length(2, 500)
+  reason!: string;
+}
+
 export class PublicRescheduleAppointmentDto extends RescheduleAppointmentDto {
   @IsString()
   @Length(40, 128)

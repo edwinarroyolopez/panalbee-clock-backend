@@ -23,6 +23,9 @@ export interface Environment {
   WHATSAPP_API_BASE_URL?: string;
   WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: string;
   WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: string;
+  WHATSAPP_APPOINTMENT_RESCHEDULED_TEMPLATE_NAME: string;
+  WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME: string;
+  WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE: string;
 }
 
 function requiredString(values: Record<string, unknown>, name: string): string {
@@ -129,6 +132,15 @@ export function validateEnvironment(
   const customerAccessTemplateLanguage =
     optionalString(values, 'WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE') ??
     'es_CO';
+  const appointmentRescheduledTemplateName =
+    optionalString(values, 'WHATSAPP_APPOINTMENT_RESCHEDULED_TEMPLATE_NAME') ??
+    'clock_appointment_rescheduled';
+  const appointmentCancelledTemplateName =
+    optionalString(values, 'WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME') ??
+    'clock_appointment_cancelled';
+  const appointmentNotificationLanguage =
+    optionalString(values, 'WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE') ??
+    'es_CO';
   if (!/^[a-z0-9_]{1,512}$/.test(customerAccessTemplateName)) {
     throw new Error(
       'Invalid environment: WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME is invalid',
@@ -137,6 +149,25 @@ export function validateEnvironment(
   if (!/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(customerAccessTemplateLanguage)) {
     throw new Error(
       'Invalid environment: WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE is invalid',
+    );
+  }
+  for (const [name, value] of [
+    [
+      'WHATSAPP_APPOINTMENT_RESCHEDULED_TEMPLATE_NAME',
+      appointmentRescheduledTemplateName,
+    ],
+    [
+      'WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME',
+      appointmentCancelledTemplateName,
+    ],
+  ]) {
+    if (!/^[a-z0-9_]{1,512}$/.test(value)) {
+      throw new Error(`Invalid environment: ${name} is invalid`);
+    }
+  }
+  if (!/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(appointmentNotificationLanguage)) {
+    throw new Error(
+      'Invalid environment: WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE is invalid',
     );
   }
 
@@ -193,5 +224,10 @@ export function validateEnvironment(
     WHATSAPP_API_BASE_URL: optionalString(values, 'WHATSAPP_API_BASE_URL'),
     WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: customerAccessTemplateName,
     WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: customerAccessTemplateLanguage,
+    WHATSAPP_APPOINTMENT_RESCHEDULED_TEMPLATE_NAME:
+      appointmentRescheduledTemplateName,
+    WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME:
+      appointmentCancelledTemplateName,
+    WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE: appointmentNotificationLanguage,
   };
 }

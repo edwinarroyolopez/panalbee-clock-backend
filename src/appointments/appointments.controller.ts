@@ -25,11 +25,12 @@ import {
   PublicAppointmentListQueryDto,
   PublicCancelAppointmentDto,
   PublicRescheduleAppointmentDto,
-  RescheduleAppointmentDto,
+  TenantRescheduleAppointmentDto,
 } from './appointment.dto';
 import type {
   AppointmentView,
   PublicAppointmentResult,
+  TenantAppointmentLifecycleView,
 } from './appointment.view';
 import { AppointmentsService } from './appointments.service';
 
@@ -65,7 +66,7 @@ export class AppointmentsController {
     @CurrentAuth() auth: TenantOperationAuthContext,
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
     @Body() dto: CancelAppointmentDto,
-  ): Promise<AppointmentView> {
+  ): Promise<TenantAppointmentLifecycleView> {
     return this.management.cancelTenant(
       auth.tenant.id,
       appointmentId,
@@ -81,14 +82,15 @@ export class AppointmentsController {
   reschedule(
     @CurrentAuth() auth: TenantOperationAuthContext,
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
-    @Body() dto: RescheduleAppointmentDto,
-  ): Promise<AppointmentView> {
+    @Body() dto: TenantRescheduleAppointmentDto,
+  ): Promise<TenantAppointmentLifecycleView> {
     return this.management.rescheduleTenant(
       auth.tenant.id,
       appointmentId,
       auth.userId,
       auth.actorType === 'DELEGATED' ? 'INTERNAL_USER' : 'TENANT_USER',
       dto.startsAt,
+      dto.reason,
     );
   }
 }

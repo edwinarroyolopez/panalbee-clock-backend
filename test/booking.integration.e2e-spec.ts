@@ -7,6 +7,7 @@ import {
   stopTestApp,
   TestApp,
 } from './booking-availability-test-app';
+import { RecordingChannelAdapter } from './channel-test-support';
 
 const ids = {
   tenant: '70000000-0000-4000-8000-000000000001',
@@ -23,16 +24,19 @@ interface AppointmentBody {
   status: string;
   startsAt: string;
   endsAt: string;
+  notificationStatus?: string;
+  notificationErrorCode?: string | null;
 }
 
 describe('appointments (integration e2e)', () => {
+  const adapter = new RecordingChannelAdapter();
   let testApp: TestApp;
   let token: string;
   let firstAppointmentId: string;
   let rescheduledAppointmentId: string;
 
   beforeAll(async () => {
-    testApp = await startTestApp();
+    testApp = await startTestApp([adapter]);
     await seedTenant(testApp.database, {
       tenant: ids.tenant,
       location: ids.location,
@@ -130,7 +134,7 @@ describe('appointments (integration e2e)', () => {
       '2099-09-01T14:00:00.000Z',
     );
 
-    await request(testApp.server)
+    const cancellation = await request(testApp.server)
       .post(`/api/v1/appointments/${firstAppointmentId}/cancel`)
       .auth(token, { type: 'bearer' })
       .send({ reason: 'Customer requested cancellation' })
@@ -138,6 +142,23 @@ describe('appointments (integration e2e)', () => {
       .expect(({ body }: { body: AppointmentBody }) =>
         expect(body.status).toBe('CANCELLED'),
       );
+    expect(cancellation.body).toMatchObject({
+      notificationStatus: 'SENT',
+      notificationErrorCode: null,
+    });
+    expect(adapter.sent).toHaveLength(1);
+    expect(adapter.sent[0]).toMatchObject({
+      externalAccountId: 'test-whatsapp-account',
+      recipientId: '+570007000001',
+      intent: {
+        kind: 'TEMPLATE',
+        name: 'clock_appointment_cancelled',
+        language: 'es_CO',
+      },
+    });
+    expect(
+      (adapter.sent[0].intent as { variables: string[] }).variables[3],
+    ).toBe('Customer requested cancellation');
     const cancellationCounts = await Promise.all([
       testApp.database.models.notification.countDocuments({
         tenantId: ids.tenant,
@@ -220,15 +241,34 @@ describe('appointments (integration e2e)', () => {
     const appointmentId = (created.body as AppointmentBody).id;
     rescheduledAppointmentId = appointmentId;
 
-    const response = await request(testApp.server)
+    await request(testApp.server)
       .post(`/api/v1/appointments/${appointmentId}/reschedule`)
       .auth(token, { type: 'bearer' })
       .send({ startsAt: '2099-09-01T16:00:00Z' })
+      .expect(400);
+
+    const response = await request(testApp.server)
+      .post(`/api/v1/appointments/${appointmentId}/reschedule`)
+      .auth(token, { type: 'bearer' })
+      .send({
+        startsAt: '2099-09-01T16:00:00Z',
+        reason: 'Team member became unavailable',
+      })
       .expect(200);
     expect(response.body as AppointmentBody).toMatchObject({
       startsAt: '2099-09-01T16:00:00.000Z',
       endsAt: '2099-09-01T17:00:00.000Z',
+      notificationStatus: 'SENT',
     });
+    expect(adapter.sent.at(-1)?.intent).toMatchObject({
+      kind: 'TEMPLATE',
+      name: 'clock_appointment_rescheduled',
+      language: 'es_CO',
+    });
+    expect(
+      (adapter.sent.at(-1)?.intent as { variables?: readonly string[] })
+        .variables,
+    ).toContain('Team member became unavailable');
     const lifecycleCounts = await Promise.all([
       testApp.database.models.notification.countDocuments({
         tenantId: ids.tenant,
@@ -244,7 +284,10 @@ describe('appointments (integration e2e)', () => {
     await request(testApp.server)
       .post(`/api/v1/appointments/${appointmentId}/reschedule`)
       .auth(token, { type: 'bearer' })
-      .send({ startsAt: '2099-09-01T16:00:00Z' })
+      .send({
+        startsAt: '2099-09-01T16:00:00Z',
+        reason: 'Team member became unavailable',
+      })
       .expect(200)
       .expect(({ body }: { body: AppointmentBody }) =>
         expect(body.startsAt).toBe('2099-09-01T16:00:00.000Z'),
@@ -309,7 +352,7 @@ describe('appointments (integration e2e)', () => {
     await request(testApp.server)
       .post(`/api/v1/appointments/${rescheduledAppointmentId}/reschedule`)
       .auth(token, { type: 'bearer' })
-      .send({ startsAt: pastStartsAt })
+      .send({ startsAt: pastStartsAt, reason: 'Unexpected closure' })
       .expect(409)
       .expect(({ body }: { body: { reasonCode: string } }) =>
         expect(body.reasonCode).toBe('APPOINTMENT_STARTS_AT_PAST'),
@@ -343,7 +386,10 @@ describe('appointments (integration e2e)', () => {
     await request(testApp.server)
       .post(`/api/v1/appointments/${appointmentId}/reschedule`)
       .auth(token, { type: 'bearer' })
-      .send({ startsAt: '2099-09-01T19:15:00Z' })
+      .send({
+        startsAt: '2099-09-01T19:15:00Z',
+        reason: 'Unexpected closure',
+      })
       .expect(409)
       .expect(({ body }: { body: { reasonCode: string } }) =>
         expect(body.reasonCode).toBe('APPOINTMENT_SLOT_CONFLICT'),
@@ -380,5 +426,32 @@ describe('appointments (integration e2e)', () => {
         entityId: appointmentId,
       }),
     ).toBe(1);
+  });
+
+  it('keeps the appointment change and reports a failed notification honestly', async () => {
+    const created = await request(testApp.server)
+      .post('/api/v1/appointments')
+      .auth(token, { type: 'bearer' })
+      .send({
+        ...payload,
+        startsAt: '2099-09-01T20:00:00Z',
+        idempotencyKey: 'booking-integration-notification-failure',
+      })
+      .expect(201);
+    adapter.failuresRemaining = 1;
+
+    const cancelled = await request(testApp.server)
+      .post(
+        `/api/v1/appointments/${(created.body as AppointmentBody).id}/cancel`,
+      )
+      .auth(token, { type: 'bearer' })
+      .send({ reason: 'Unexpected building closure' })
+      .expect(200);
+
+    expect(cancelled.body).toMatchObject({
+      status: 'CANCELLED',
+      notificationStatus: 'FAILED',
+      notificationErrorCode: 'CHANNEL_DELIVERY_UNAVAILABLE',
+    });
   });
 });

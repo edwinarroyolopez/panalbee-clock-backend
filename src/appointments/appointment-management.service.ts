@@ -9,9 +9,14 @@ import {
 } from './appointment-management-access.service';
 import { AppointmentEffectsService } from './appointment-effects.service';
 import { AppointmentIntervalLockService } from './appointment-interval-lock.service';
+import { AppointmentLifecycleNotificationService } from './appointment-lifecycle-notification.service';
 import { AppointmentPublicQueryService } from './appointment-public-query.service';
 import { AppointmentRescheduleRelationService } from './appointment-reschedule-relation.service';
-import { AppointmentView, appointmentView } from './appointment.view';
+import {
+  AppointmentView,
+  appointmentView,
+  TenantAppointmentLifecycleView,
+} from './appointment.view';
 
 @Injectable()
 export class AppointmentManagementService {
@@ -21,6 +26,7 @@ export class AppointmentManagementService {
     private readonly availability: AvailabilityService,
     private readonly effects: AppointmentEffectsService,
     private readonly intervalLocks: AppointmentIntervalLockService,
+    private readonly lifecycleNotifications: AppointmentLifecycleNotificationService,
     private readonly publicQuery: AppointmentPublicQueryService,
     private readonly rescheduleRelations: AppointmentRescheduleRelationService,
     private readonly publicAccessService: AccountPublicAccessService,
@@ -40,14 +46,14 @@ export class AppointmentManagementService {
     return this.publicQuery.listCustomer(tenantId, customerId);
   }
 
-  cancelTenant(
+  async cancelTenant(
     tenantId: string,
     appointmentId: string,
     actorUserId: string,
     actorType: 'TENANT_USER' | 'INTERNAL_USER',
     reason: string,
-  ): Promise<AppointmentView> {
-    return this.cancel(
+  ): Promise<TenantAppointmentLifecycleView> {
+    const appointment = await this.cancel(
       {
         tenantId,
         appointmentId,
@@ -56,6 +62,11 @@ export class AppointmentManagementService {
         publicOnly: false,
       },
       reason,
+    );
+    return this.lifecycleNotifications.deliver(
+      tenantId,
+      appointment,
+      'BOOKING_CANCELLED',
     );
   }
 
@@ -83,14 +94,15 @@ export class AppointmentManagementService {
     );
   }
 
-  rescheduleTenant(
+  async rescheduleTenant(
     tenantId: string,
     appointmentId: string,
     actorUserId: string,
     actorType: 'TENANT_USER' | 'INTERNAL_USER',
     startsAt: string,
-  ): Promise<AppointmentView> {
-    return this.reschedule(
+    reason: string,
+  ): Promise<TenantAppointmentLifecycleView> {
+    const appointment = await this.reschedule(
       {
         tenantId,
         appointmentId,
@@ -99,6 +111,12 @@ export class AppointmentManagementService {
         publicOnly: false,
       },
       startsAt,
+      reason,
+    );
+    return this.lifecycleNotifications.deliver(
+      tenantId,
+      appointment,
+      'BOOKING_RESCHEDULED',
     );
   }
 
@@ -179,6 +197,7 @@ export class AppointmentManagementService {
   private async reschedule(
     access: ManagementAccess,
     startsAtInput: string,
+    reason?: string,
   ): Promise<AppointmentView> {
     const startsAt = new Date(startsAtInput);
     return this.database.withTransaction(async (session) => {
@@ -245,6 +264,7 @@ export class AppointmentManagementService {
         updated,
         'BOOKING_RESCHEDULED',
         'APPOINTMENT_RESCHEDULED',
+        reason?.trim(),
       );
       return appointmentView(updated.toObject());
     });

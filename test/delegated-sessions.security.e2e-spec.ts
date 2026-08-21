@@ -389,7 +389,10 @@ describe('DelegatedSession (security e2e)', () => {
     await request(server)
       .post(`/api/v1/appointments/${appointmentId}/reschedule`)
       .auth(accessToken, { type: 'bearer' })
-      .send({ startsAt: '2099-09-03T16:00:00Z' })
+      .send({
+        startsAt: '2099-09-03T16:00:00Z',
+        reason: 'Unexpected staff absence',
+      })
       .expect(200);
     await request(server)
       .post(`/api/v1/appointments/${appointmentId}/cancel`)

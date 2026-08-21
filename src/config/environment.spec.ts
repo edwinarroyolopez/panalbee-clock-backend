@@ -26,6 +26,11 @@ describe('validateEnvironment', () => {
       CORS_ORIGINS: ['http://localhost:3001', 'https://clock.example.test'],
       WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: 'login_otp_temp',
       WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: 'es_CO',
+      WHATSAPP_APPOINTMENT_RESCHEDULED_TEMPLATE_NAME:
+        'clock_appointment_rescheduled',
+      WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME:
+        'clock_appointment_cancelled',
+      WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE: 'es_CO',
     });
   });
 
@@ -90,5 +95,20 @@ describe('validateEnvironment', () => {
         WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: 'spanish',
       }),
     ).toThrow('WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE');
+  });
+
+  it('validates WhatsApp appointment template identifiers', () => {
+    expect(() =>
+      validateEnvironment({
+        ...valid,
+        WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME: 'Invalid template',
+      }),
+    ).toThrow('WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME');
+    expect(() =>
+      validateEnvironment({
+        ...valid,
+        WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE: 'spanish',
+      }),
+    ).toThrow('WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE');
   });
 });

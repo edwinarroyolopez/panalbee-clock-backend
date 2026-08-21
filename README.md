@@ -24,6 +24,16 @@ approved template with `WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME` and
 `WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE`; defaults are `login_otp_temp` and
 `es_CO`. The template body receives the six-digit code as its first variable.
 
+Tenant operators can cancel or reschedule active appointments only with a
+required unforeseen-event reason. The appointment change is committed before
+immediate notification delivery, so tenant lifecycle responses include
+`notificationStatus` and `notificationErrorCode` when manual customer contact
+is needed. Configure the approved `es_CO` templates with
+`WHATSAPP_APPOINTMENT_RESCHEDULED_TEMPLATE_NAME` and
+`WHATSAPP_APPOINTMENT_CANCELLED_TEMPLATE_NAME`. Both receive customer name,
+tenant name, localized appointment time, and reason in that order. Delivery
+uses the tenant's active WhatsApp channel or `WHATSAPP_PHONE_NUMBER_ID`.
+
 ## Routes
 
 - `GET /api/v1/health/live`, `GET /api/v1/health/ready`

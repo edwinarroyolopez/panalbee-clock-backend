@@ -29,6 +29,7 @@ function childEnvironment(uri: string): NodeJS.ProcessEnv {
     ACCESS_TOKEN_AUDIENCE: 'panalbee-clock-test-api',
     ACCESS_TOKEN_TTL_SECONDS: '300',
     CORS_ORIGINS: 'http://localhost:3001',
+    WHATSAPP_PHONE_NUMBER_ID: 'test-whatsapp-account',
   };
 }
 

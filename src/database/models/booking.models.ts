@@ -75,6 +75,8 @@ export interface NotificationEntity extends TimestampedEntity {
   status: NotificationStatus;
   attempts: number;
   idempotencyKey: string;
+  changeReason?: string | null;
+  appointmentStartsAt?: Date | null;
   lastErrorCode?: string | null;
   leaseUntil?: Date | null;
 }
@@ -231,6 +233,8 @@ export const NotificationSchema: Schema<NotificationEntity> =
       },
       attempts: { type: Number, default: 0, min: 0 },
       idempotencyKey: { type: String, required: true },
+      changeReason: { type: String, minlength: 2, maxlength: 500 },
+      appointmentStartsAt: { type: Date },
       lastErrorCode: { type: String },
       leaseUntil: { type: Date },
     },

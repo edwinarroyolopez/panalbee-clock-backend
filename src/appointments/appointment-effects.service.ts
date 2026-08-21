@@ -78,6 +78,8 @@ export class AppointmentEffectsService {
             scheduledFor: new Date(),
             status: 'PENDING',
             attempts: 0,
+            ...(reason ? { changeReason: reason } : {}),
+            appointmentStartsAt: appointment.startsAt,
             idempotencyKey: `appointment:${appointment._id}:${notificationType}:${effectTime}`,
           },
         },

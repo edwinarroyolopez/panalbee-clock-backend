@@ -3,9 +3,11 @@ import { AccountsModule } from '../accounts/accounts.module';
 import { AvailabilityModule } from '../availability/availability.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { CONVERSATION_COMMAND_HANDLER } from '../conversations/conversation-command.port';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AppointmentCreationStore } from './appointment-creation.store';
 import { AppointmentEffectsService } from './appointment-effects.service';
 import { AppointmentIntervalLockService } from './appointment-interval-lock.service';
+import { AppointmentLifecycleNotificationService } from './appointment-lifecycle-notification.service';
 import { AppointmentManagementAccessService } from './appointment-management-access.service';
 import { AppointmentManagementService } from './appointment-management.service';
 import { AppointmentPublicQueryService } from './appointment-public-query.service';
@@ -25,7 +27,12 @@ import { CustomerAppointmentAccessService } from './customer-appointment-access.
 import { CustomerAccessDeliveryService } from './customer-access-delivery.service';
 
 @Module({
-  imports: [AccountsModule, AvailabilityModule, ChannelsModule],
+  imports: [
+    AccountsModule,
+    AvailabilityModule,
+    ChannelsModule,
+    NotificationsModule,
+  ],
   controllers: [
     AppointmentsController,
     PublicAppointmentsController,
@@ -38,6 +45,7 @@ import { CustomerAccessDeliveryService } from './customer-access-delivery.servic
     AppointmentCreationStore,
     AppointmentEffectsService,
     AppointmentIntervalLockService,
+    AppointmentLifecycleNotificationService,
     AppointmentManagementAccessService,
     AppointmentPublicQueryService,
     AppointmentRescheduleRelationService,
