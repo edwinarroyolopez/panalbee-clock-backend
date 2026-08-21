@@ -17,11 +17,13 @@ const ids = {
   staffMembership: 'a0000000-0000-4000-8000-000000000007',
 };
 const password = 'correct-password';
+const ownerPassword = ' owner-password-123 ';
 const createPayload = {
   businessName: 'Bee Studio',
   slug: 'Bee-Studio',
   ownerEmail: 'OWNER@EXAMPLE.TEST',
   ownerPhone: '+573001234567',
+  ownerPassword,
   planCode: 'STARTER',
   status: 'TRIAL',
   publicBookingEnabled: true,
@@ -40,6 +42,7 @@ describe('Account control plane (security e2e)', () => {
   let accountId: string;
   let accountTenantId: string;
   let ownerUserId: string;
+  let ownerToken: string;
 
   beforeAll(async () => {
     const testApp = await createCoreTestApplication();
@@ -130,7 +133,7 @@ describe('Account control plane (security e2e)', () => {
       owner: {
         email: 'owner@example.test',
         phone: '+573001234567',
-        status: 'PENDING_ACTIVATION',
+        status: 'ACTIVE',
       },
     });
     expect(JSON.stringify(body)).not.toMatch(
@@ -175,8 +178,24 @@ describe('Account control plane (security e2e)', () => {
     );
     await request(server)
       .post('/api/v1/auth/login')
-      .send({ email: 'owner@example.test', password })
+      .send({ phone: createPayload.ownerPhone, password: ownerPassword.trim() })
       .expect(401);
+    const ownerLogin = await request(server)
+      .post('/api/v1/auth/login')
+      .send({ phone: createPayload.ownerPhone, password: ownerPassword })
+      .expect(200);
+    ownerToken = (ownerLogin.body as { accessToken: string }).accessToken;
+    expect(ownerLogin.body).toMatchObject({
+      user: {
+        actorType: 'TENANT',
+        phone: createPayload.ownerPhone,
+        tenant: { id: accountTenantId, slug: 'bee-studio' },
+      },
+    });
+    expect(JSON.stringify(ownerLogin.body)).not.toContain(ownerPassword);
+    expect(JSON.stringify(ownerLogin.body)).not.toMatch(
+      /ownerPassword|passwordHash/i,
+    );
   });
 
   it('maps slug and phone conflicts without leaving partial aggregates', async () => {
@@ -550,12 +569,6 @@ describe('Account control plane (security e2e)', () => {
   });
 
   it('authorizes tenant profile updates by role and rejects a foreign route slug', async () => {
-    const activeHash = await hashPassword(password);
-    await database.models.user.updateOne(
-      { _id: ownerUserId },
-      { $set: { status: 'ACTIVE', passwordHash: activeHash } },
-    );
-    const ownerToken = await login('owner@example.test');
     await request(server)
       .get('/api/v1/accounts/bee-studio')
       .auth(ownerToken, { type: 'bearer' })

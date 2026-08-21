@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
@@ -13,16 +13,6 @@ import { DatabaseService } from '../src/database/database.service';
 import { syncClockIndexes } from '../src/database/models';
 import { hashPassword } from '../src/auth/password';
 
-const BACKEND_PORT = 7100;
-const ADMIN_PORT = 3001;
-const WEB_PORT = 3002;
-const BACKOFFICE_PORT = 3003;
-const REQUIRED_PORTS = [
-  BACKEND_PORT,
-  ADMIN_PORT,
-  WEB_PORT,
-  BACKOFFICE_PORT,
-] as const;
 const STARTUP_TIMEOUT_MS = 180_000;
 
 const backendDirectory = resolve(__dirname, '..');
@@ -58,6 +48,19 @@ function randomSecret(bytes = 32): string {
   const value = randomBytes(bytes).toString('base64url');
   redactedValues.add(value);
   return value;
+}
+
+function connectedPort(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (value === undefined) return fallback;
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`${name} must be an integer between 1 and 65535`);
+  }
+  const port = Number(value);
+  if (port < 1 || port > 65_535) {
+    throw new Error(`${name} must be an integer between 1 and 65535`);
+  }
+  return port;
 }
 
 function calendarDateInBogota(daysAhead: number): string {
@@ -279,13 +282,10 @@ async function assertDatabaseState(
   assert.equal(location.timezone, 'America/Bogota');
   assert.equal(location.publicBookingEnabled, true);
   const owner = await models.user.findById(account.ownerUserId).lean().exec();
-  assert.ok(owner, 'pending Account owner was not persisted');
+  assert.ok(owner, 'active Account owner was not persisted');
   assert.equal(owner.actorType, 'TENANT');
-  assert.equal(owner.status, 'PENDING_ACTIVATION');
-  assert.ok(
-    owner.passwordHash,
-    'owner must retain an inaccessible random hash',
-  );
+  assert.equal(owner.status, 'ACTIVE');
+  assert.ok(owner.passwordHash, 'owner password must be stored only as a hash');
   assert.equal(
     await models.tenantMembership.countDocuments({
       tenantId: tenant._id,
@@ -524,12 +524,22 @@ function installSignalCleanup(): void {
 }
 
 async function runConnectedGate(): Promise<void> {
+  const BACKEND_PORT = connectedPort('CONNECTED_BACKEND_PORT', 7100);
+  const ADMIN_PORT = connectedPort('CONNECTED_ADMIN_PORT', 3001);
+  const WEB_PORT = connectedPort('CONNECTED_WEB_PORT', 3002);
+  const BACKOFFICE_PORT = connectedPort('CONNECTED_BACKOFFICE_PORT', 3003);
+  const REQUIRED_PORTS = [BACKEND_PORT, ADMIN_PORT, WEB_PORT, BACKOFFICE_PORT];
+  if (new Set(REQUIRED_PORTS).size !== REQUIRED_PORTS.length) {
+    throw new Error('Connected gate ports must be distinct');
+  }
+
   const startedAt = Date.now();
   installSignalCleanup();
   await Promise.all(REQUIRED_PORTS.map(assertPortAvailable));
 
   const platformAdminId = randomUUID();
   const platformEmail = `platform-${randomBytes(6).toString('hex')}@connected.test`;
+  const platformPhone = `+573${randomInt(1_000_000_000).toString().padStart(9, '0')}`;
   const platformPassword = randomSecret(24);
   const accessTokenSecret = randomSecret();
   const managementTokenSecret = randomSecret();
@@ -554,12 +564,12 @@ async function runConnectedGate(): Promise<void> {
     ACCESS_TOKEN_AUDIENCE: 'panalbee-clock-connected-api',
     ACCESS_TOKEN_TTL_SECONDS: '900',
     CORS_ORIGINS: [
-      'http://127.0.0.1:3001',
-      'http://127.0.0.1:3002',
-      'http://127.0.0.1:3003',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
+      `http://127.0.0.1:${ADMIN_PORT}`,
+      `http://127.0.0.1:${WEB_PORT}`,
+      `http://127.0.0.1:${BACKOFFICE_PORT}`,
+      `http://localhost:${ADMIN_PORT}`,
+      `http://localhost:${WEB_PORT}`,
+      `http://localhost:${BACKOFFICE_PORT}`,
     ].join(','),
   });
 
@@ -578,6 +588,7 @@ async function runConnectedGate(): Promise<void> {
   await database.models.user.create({
     _id: platformAdminId,
     email: platformEmail,
+    phone: platformPhone,
     displayName: 'Connected Platform Admin',
     passwordHash: await hashPassword(platformPassword),
     actorType: 'INTERNAL',
@@ -646,7 +657,11 @@ async function runConnectedGate(): Promise<void> {
 
   await runPlaywright({
     ...safeChildEnvironment('test'),
-    CONNECTED_PLATFORM_EMAIL: platformEmail,
+    CONNECTED_BACKEND_PORT: String(BACKEND_PORT),
+    CONNECTED_ADMIN_PORT: String(ADMIN_PORT),
+    CONNECTED_WEB_PORT: String(WEB_PORT),
+    CONNECTED_BACKOFFICE_PORT: String(BACKOFFICE_PORT),
+    CONNECTED_PLATFORM_PHONE: platformPhone,
     CONNECTED_PLATFORM_PASSWORD: platformPassword,
     CONNECTED_ACCOUNT_SLUG: accountSlug,
     CONNECTED_APPOINTMENT_DATE: appointmentDate,

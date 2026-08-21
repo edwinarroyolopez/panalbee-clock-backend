@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { InternalAuthContext } from '../auth/auth.types';
 import { hashPassword } from '../auth/password';
@@ -51,9 +51,7 @@ export class AccountProvisioningService {
       membership: randomUUID(),
       profile: randomUUID(),
     };
-    const passwordHash = await hashPassword(
-      randomBytes(48).toString('base64url'),
-    );
+    const passwordHash = await hashPassword(dto.ownerPassword);
     const tenantStatus = dto.status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE';
 
     try {
@@ -106,7 +104,7 @@ export class AccountProvisioningService {
               displayName: `${dto.businessName} Owner`,
               passwordHash,
               actorType: 'TENANT',
-              status: 'PENDING_ACTIVATION',
+              status: 'ACTIVE',
             },
           ],
           { session },

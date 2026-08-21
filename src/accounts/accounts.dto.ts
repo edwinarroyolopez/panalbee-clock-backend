@@ -48,6 +48,10 @@ export class CreateAccountDto {
   @Matches(/^\+[1-9]\d{7,14}$/)
   ownerPhone!: string;
 
+  @IsString()
+  @Length(8, 128)
+  ownerPassword!: string;
+
   @IsOptional()
   @Transform(trim)
   @IsString()
