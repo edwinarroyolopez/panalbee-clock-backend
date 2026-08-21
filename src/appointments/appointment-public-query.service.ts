@@ -17,12 +17,35 @@ export class AppointmentPublicQueryService {
       .lean()
       .exec();
     if (!tenant) return { items: [] };
+    return this.listAppointments(
+      tenant._id,
+      { managementTokenHash: tokenHash(managementToken) },
+      1,
+    );
+  }
+
+  async listCustomer(
+    tenantId: string,
+    customerId: string,
+  ): Promise<{ items: AppointmentView[] }> {
+    const activeTenant = await this.database.models.tenant
+      .exists({ _id: tenantId, status: 'ACTIVE' })
+      .exec();
+    if (!activeTenant) return { items: [] };
+    return this.listAppointments(tenantId, { customerId }, -1);
+  }
+
+  private async listAppointments(
+    tenantId: string,
+    ownership: { managementTokenHash: string } | { customerId: string },
+    sortDirection: 1 | -1,
+  ): Promise<{ items: AppointmentView[] }> {
     const appointments = await this.database.models.appointment
       .find({
-        tenantId: tenant._id,
-        managementTokenHash: tokenHash(managementToken),
+        tenantId,
+        ...ownership,
       })
-      .sort({ startsAt: 1, _id: 1 })
+      .sort({ startsAt: sortDirection, _id: sortDirection })
       .lean()
       .exec();
     if (appointments.length === 0) return { items: [] };
@@ -30,21 +53,21 @@ export class AppointmentPublicQueryService {
     const [locations, services, staff] = await Promise.all([
       this.database.models.location
         .find({
-          tenantId: tenant._id,
+          tenantId,
           _id: { $in: appointments.map((item) => item.locationId) },
         })
         .lean()
         .exec(),
       this.database.models.service
         .find({
-          tenantId: tenant._id,
+          tenantId,
           _id: { $in: appointments.map((item) => item.serviceId) },
         })
         .lean()
         .exec(),
       this.database.models.staff
         .find({
-          tenantId: tenant._id,
+          tenantId,
           _id: { $in: appointments.map((item) => item.staffId) },
         })
         .lean()

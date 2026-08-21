@@ -13,10 +13,16 @@ yarn db:indexes
 yarn start:dev
 ```
 
-Configuration is validated at startup. `MONGODB_URI`, a 32-byte minimum
-`ACCESS_TOKEN_SECRET`, issuer, audience, and comma-separated `CORS_ORIGINS` are
-required. Access tokens are short-lived JOSE HS256 bearer tokens. Passwords are
-stored with Node scrypt hashes.
+Configuration is validated at startup. `MONGODB_URI`, 32-byte minimum access
+and management secrets, issuer, audience, and comma-separated `CORS_ORIGINS`
+are required. Access tokens are short-lived JOSE HS256 bearer tokens. Passwords
+are stored with Node scrypt hashes.
+
+Customer phone access sends a WhatsApp template through the tenant's active
+WhatsApp channel, falling back to `WHATSAPP_PHONE_NUMBER_ID`. Configure the
+approved template with `WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME` and
+`WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE`; defaults are `login_otp_temp` and
+`es_CO`. The template body receives the six-digit code as its first variable.
 
 ## Routes
 
@@ -24,6 +30,17 @@ stored with Node scrypt hashes.
 - `POST /api/v1/auth/login`, `GET /api/v1/auth/me`
 - `GET /api/v1/tenants/me`, authenticated tenant location reads and update
 - `GET /api/v1/backoffice/tenants`, admin-only audited tenant status update
+- `POST /api/v1/public/:tenantSlug/customer-access/challenges`, request a
+  non-enumerating WhatsApp verification challenge
+- `POST /api/v1/public/:tenantSlug/customer-access/sessions`, exchange the code
+  for a 12-hour opaque customer bearer
+- `GET|POST /api/v1/public/:tenantSlug/customer-appointments/*`, list and manage
+  only appointments owned by the verified customer
+
+Verification codes expire after 10 minutes, allow five attempts, and are
+stored only as domain-separated HMACs. Customer session tokens are returned
+once and persisted only as SHA-256 hashes. MongoDB TTL indexes remove expired
+challenge and session records.
 
 Unknown DTO fields are rejected. Errors use stable `reasonCode` envelopes and
 include the response `x-request-id` value.

@@ -13,6 +13,8 @@ import {
   AppointmentIntervalLockEntity,
   AppointmentIntervalLockSchema,
   AppointmentSchema,
+  CustomerAccessChallengeEntity,
+  CustomerAccessChallengeSchema,
   NotificationEntity,
   NotificationSchema,
 } from './booking.models';
@@ -87,6 +89,10 @@ export const CLOCK_MODEL_DEFINITIONS: ModelDefinition[] = [
     name: MODEL_NAMES.AppointmentIntervalLock,
     schema: AppointmentIntervalLockSchema,
   },
+  {
+    name: MODEL_NAMES.CustomerAccessChallenge,
+    schema: CustomerAccessChallengeSchema,
+  },
   { name: MODEL_NAMES.Channel, schema: ChannelSchema },
   { name: MODEL_NAMES.Conversation, schema: ConversationSchema },
   {
@@ -115,6 +121,7 @@ export interface ClockModels {
   availabilityException: Model<AvailabilityExceptionEntity>;
   appointment: Model<AppointmentEntity>;
   appointmentIntervalLock: Model<AppointmentIntervalLockEntity>;
+  customerAccessChallenge: Model<CustomerAccessChallengeEntity>;
   channel: Model<ChannelEntity>;
   conversation: Model<ConversationEntity>;
   conversationStateHistory: Model<ConversationStateHistoryEntity>;
@@ -153,6 +160,10 @@ export function clockModels(connection: Connection): ClockModels {
     appointmentIntervalLock: registeredModel(
       connection,
       MODEL_NAMES.AppointmentIntervalLock,
+    ),
+    customerAccessChallenge: registeredModel(
+      connection,
+      MODEL_NAMES.CustomerAccessChallenge,
     ),
     channel: registeredModel(connection, MODEL_NAMES.Channel),
     conversation: registeredModel(connection, MODEL_NAMES.Conversation),

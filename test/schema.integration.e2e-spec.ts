@@ -85,6 +85,22 @@ describe('MongoDB schema and indexes (integration)', () => {
     ).rejects.toMatchObject({ code: 11000 });
   });
 
+  it('enforces one customer access challenge per phone cooldown bucket', async () => {
+    const challenge = {
+      tenantId: ids.tenantA,
+      phoneHash: 'a'.repeat(64),
+      requestBucket: 123,
+      requesterHash: 'b'.repeat(64),
+      codeHash: 'c'.repeat(64),
+      codeExpiresAt: new Date(Date.now() + 60_000),
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+    await database.models.customerAccessChallenge.create(challenge);
+    await expect(
+      database.models.customerAccessChallenge.create(challenge),
+    ).rejects.toMatchObject({ code: 11000 });
+  });
+
   it('keeps audit events append-only through model middleware', async () => {
     const event = await database.models.auditEvent.create({
       tenantId: ids.tenantA,

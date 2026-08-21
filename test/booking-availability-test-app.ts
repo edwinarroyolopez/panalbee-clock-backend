@@ -12,6 +12,8 @@ import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import { AuthModule } from '../src/auth/auth.module';
 import { AuthorityGuard } from '../src/auth/authority.guard';
 import { AvailabilityModule } from '../src/availability/availability.module';
+import { ChannelAdapter } from '../src/channels/channel-adapter';
+import { CHANNEL_ADAPTERS } from '../src/channels/channel-adapter.registry';
 import { CatalogModule } from '../src/catalog/catalog.module';
 import { configureApplication } from '../src/common/configure-application';
 import { validateEnvironment } from '../src/config/environment';
@@ -61,10 +63,16 @@ export interface TestApp {
   database: DatabaseService;
 }
 
-export async function startTestApp(): Promise<TestApp> {
-  const fixture = await Test.createTestingModule({
+export async function startTestApp(
+  adapters?: readonly ChannelAdapter[],
+): Promise<TestApp> {
+  let builder = Test.createTestingModule({
     imports: [BookingAvailabilityTestModule],
-  }).compile();
+  });
+  if (adapters) {
+    builder = builder.overrideProvider(CHANNEL_ADAPTERS).useValue(adapters);
+  }
+  const fixture = await builder.compile();
   const app = fixture.createNestApplication();
   configureApplication(app);
   await app.init();

@@ -21,6 +21,8 @@ export interface Environment {
   WABA_ID?: string;
   WHATSAPP_PHONE_NUMBER_ID?: string;
   WHATSAPP_API_BASE_URL?: string;
+  WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: string;
+  WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: string;
 }
 
 function requiredString(values: Record<string, unknown>, name: string): string {
@@ -121,6 +123,22 @@ export function validateEnvironment(
       'Invalid environment: MONGODB_MIN_POOL_SIZE must not exceed MONGODB_MAX_POOL_SIZE',
     );
   }
+  const customerAccessTemplateName =
+    optionalString(values, 'WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME') ??
+    'login_otp_temp';
+  const customerAccessTemplateLanguage =
+    optionalString(values, 'WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE') ??
+    'es_CO';
+  if (!/^[a-z0-9_]{1,512}$/.test(customerAccessTemplateName)) {
+    throw new Error(
+      'Invalid environment: WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME is invalid',
+    );
+  }
+  if (!/^[a-z]{2,3}(?:_[A-Z]{2})?$/.test(customerAccessTemplateLanguage)) {
+    throw new Error(
+      'Invalid environment: WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE is invalid',
+    );
+  }
 
   return {
     NODE_ENV: nodeEnvironment as NodeEnvironment,
@@ -173,5 +191,7 @@ export function validateEnvironment(
       'WHATSAPP_PHONE_NUMBER_ID',
     ),
     WHATSAPP_API_BASE_URL: optionalString(values, 'WHATSAPP_API_BASE_URL'),
+    WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: customerAccessTemplateName,
+    WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: customerAccessTemplateLanguage,
   };
 }

@@ -24,6 +24,8 @@ describe('validateEnvironment', () => {
       MONGODB_MAX_POOL_SIZE: 5,
       ACCESS_TOKEN_TTL_SECONDS: 300,
       CORS_ORIGINS: ['http://localhost:3001', 'https://clock.example.test'],
+      WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: 'login_otp_temp',
+      WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: 'es_CO',
     });
   });
 
@@ -73,5 +75,20 @@ describe('validateEnvironment', () => {
         MONGODB_MAX_POOL_SIZE: '5',
       }),
     ).toThrow('MONGODB_MIN_POOL_SIZE');
+  });
+
+  it('validates WhatsApp customer-access template identifiers', () => {
+    expect(() =>
+      validateEnvironment({
+        ...valid,
+        WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME: 'Invalid template',
+      }),
+    ).toThrow('WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME');
+    expect(() =>
+      validateEnvironment({
+        ...valid,
+        WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE: 'spanish',
+      }),
+    ).toThrow('WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_LANGUAGE');
   });
 });

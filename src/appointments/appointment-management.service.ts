@@ -1,30 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import { ClientSession } from 'mongoose';
 import { AccountPublicAccessService } from '../accounts/account-public-access.service';
 import { AvailabilityService } from '../availability/availability.service';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
-import { AppointmentEntity } from '../database/models';
+import {
+  AppointmentManagementAccessService,
+  ManagementAccess,
+} from './appointment-management-access.service';
 import { AppointmentEffectsService } from './appointment-effects.service';
 import { AppointmentIntervalLockService } from './appointment-interval-lock.service';
 import { AppointmentPublicQueryService } from './appointment-public-query.service';
 import { AppointmentRescheduleRelationService } from './appointment-reschedule-relation.service';
 import { AppointmentView, appointmentView } from './appointment.view';
-import { tokenHash } from './appointments.service';
-
-interface ManagementAccess {
-  tenantId: string;
-  appointmentId: string;
-  actorUserId: string | null;
-  actorType: 'TENANT_USER' | 'INTERNAL_USER' | 'CUSTOMER';
-  publicOnly: boolean;
-  token?: string;
-}
 
 @Injectable()
 export class AppointmentManagementService {
   constructor(
     private readonly database: DatabaseService,
+    private readonly accesses: AppointmentManagementAccessService,
     private readonly availability: AvailabilityService,
     private readonly effects: AppointmentEffectsService,
     private readonly intervalLocks: AppointmentIntervalLockService,
@@ -38,6 +31,13 @@ export class AppointmentManagementService {
     managementToken: string,
   ): Promise<{ items: AppointmentView[] }> {
     return this.publicQuery.list(tenantSlug, managementToken);
+  }
+
+  async listCustomer(
+    tenantId: string,
+    customerId: string,
+  ): Promise<{ items: AppointmentView[] }> {
+    return this.publicQuery.listCustomer(tenantId, customerId);
   }
 
   cancelTenant(
@@ -66,7 +66,19 @@ export class AppointmentManagementService {
     reason: string,
   ): Promise<AppointmentView> {
     return this.cancel(
-      await this.publicAccess(tenantSlug, appointmentId, token),
+      await this.accesses.public(tenantSlug, appointmentId, token),
+      reason,
+    );
+  }
+
+  cancelCustomer(
+    tenantId: string,
+    customerId: string,
+    appointmentId: string,
+    reason: string,
+  ): Promise<AppointmentView> {
+    return this.cancel(
+      this.accesses.customer(tenantId, customerId, appointmentId),
       reason,
     );
   }
@@ -97,7 +109,19 @@ export class AppointmentManagementService {
     startsAt: string,
   ): Promise<AppointmentView> {
     return this.reschedule(
-      await this.publicAccess(tenantSlug, appointmentId, token),
+      await this.accesses.public(tenantSlug, appointmentId, token),
+      startsAt,
+    );
+  }
+
+  rescheduleCustomer(
+    tenantId: string,
+    customerId: string,
+    appointmentId: string,
+    startsAt: string,
+  ): Promise<AppointmentView> {
+    return this.reschedule(
+      this.accesses.customer(tenantId, customerId, appointmentId),
       startsAt,
     );
   }
@@ -107,7 +131,7 @@ export class AppointmentManagementService {
     reason: string,
   ): Promise<AppointmentView> {
     return this.database.withTransaction(async (session) => {
-      const appointment = await this.load(access, session);
+      const appointment = await this.accesses.load(access, session);
       const normalizedReason = reason.trim();
       if (
         appointment.status === 'CANCELLED' &&
@@ -164,7 +188,7 @@ export class AppointmentManagementService {
           session,
         );
       }
-      const appointment = await this.load(access, session);
+      const appointment = await this.accesses.load(access, session);
       this.assertActive(appointment);
       if (appointment.startsAt.getTime() === startsAt.getTime()) {
         return appointmentView(appointment);
@@ -226,56 +250,10 @@ export class AppointmentManagementService {
     });
   }
 
-  private async load(
-    access: ManagementAccess,
-    session: ClientSession,
-  ): Promise<AppointmentEntity> {
-    if (access.publicOnly) {
-      const activeTenant = await this.database.models.tenant
-        .exists({ _id: access.tenantId, status: 'ACTIVE' })
-        .session(session)
-        .exec();
-      if (!activeTenant) throw appointmentNotFound();
-    }
-    const appointment = await this.database.models.appointment
-      .findOne({
-        _id: access.appointmentId,
-        tenantId: access.tenantId,
-        ...(access.token
-          ? { managementTokenHash: tokenHash(access.token) }
-          : {}),
-      })
-      .session(session)
-      .lean()
-      .exec();
-    if (!appointment) throw appointmentNotFound();
-    return appointment;
-  }
-
-  private assertActive(appointment: AppointmentEntity): void {
+  private assertActive(appointment: { status: string }): void {
     if (!['PENDING', 'CONFIRMED'].includes(appointment.status)) {
       throw appointmentNotActive();
     }
-  }
-
-  private async publicAccess(
-    tenantSlug: string,
-    appointmentId: string,
-    token: string,
-  ): Promise<ManagementAccess> {
-    const tenant = await this.database.models.tenant
-      .findOne({ slug: tenantSlug, status: 'ACTIVE' })
-      .lean()
-      .exec();
-    if (!tenant) throw appointmentNotFound();
-    return {
-      tenantId: tenant._id,
-      appointmentId,
-      actorUserId: null,
-      actorType: 'CUSTOMER',
-      publicOnly: true,
-      token,
-    };
   }
 }
 
@@ -286,9 +264,6 @@ function actorFor(access: ManagementAccess) {
     actorType: access.actorType,
   };
 }
-
-const appointmentNotFound = (): AppException =>
-  new AppException(404, 'APPOINTMENT_NOT_FOUND', 'Appointment not found');
 
 const appointmentNotActive = (): AppException =>
   new AppException(409, 'APPOINTMENT_NOT_ACTIVE', 'Appointment is not active');

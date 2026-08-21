@@ -108,6 +108,18 @@ export class PublicAppointmentListQueryDto {
   managementToken?: string;
 }
 
+export class RequestCustomerAccessCodeDto {
+  @IsString()
+  @Matches(/^\+[1-9]\d{6,14}$/)
+  phone!: string;
+}
+
+export class VerifyCustomerAccessCodeDto extends RequestCustomerAccessCodeDto {
+  @IsString()
+  @Matches(/^\d{6}$/)
+  code!: string;
+}
+
 export class CancelAppointmentDto {
   @IsString()
   @Length(2, 500)
