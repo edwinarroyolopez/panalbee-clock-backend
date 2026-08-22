@@ -121,7 +121,7 @@ export class PublicCustomerAppointmentsController {
   }
 }
 
-function bearerToken(authorization: string | undefined): string {
+export function bearerToken(authorization: string | undefined): string {
   const match = authorization?.match(/^Bearer ([A-Za-z0-9_-]{43})$/i);
   if (!match) {
     throw new AppException(

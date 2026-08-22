@@ -14,6 +14,9 @@ export interface Environment {
   ACCESS_TOKEN_AUDIENCE: string;
   ACCESS_TOKEN_TTL_SECONDS: number;
   CORS_ORIGINS: string[];
+  CLOUDINARY_CLOUD_NAME?: string;
+  CLOUDINARY_API_KEY?: string;
+  CLOUDINARY_API_SECRET?: string;
   WHATSAPP_API_VERSION?: string;
   WHATSAPP_PERMANENT_TOKEN?: string;
   WHATSAPP_APP_SECRET?: string;
@@ -141,6 +144,18 @@ export function validateEnvironment(
   const appointmentNotificationLanguage =
     optionalString(values, 'WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE') ??
     'es_CO';
+  const cloudinaryCloudName = optionalString(values, 'CLOUDINARY_CLOUD_NAME');
+  const cloudinaryApiKey = optionalString(values, 'CLOUDINARY_API_KEY');
+  const cloudinaryApiSecret = optionalString(values, 'CLOUDINARY_API_SECRET');
+  if (
+    [cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret].filter(Boolean)
+      .length !== 0 &&
+    ![cloudinaryCloudName, cloudinaryApiKey, cloudinaryApiSecret].every(Boolean)
+  ) {
+    throw new Error(
+      'Invalid environment: Cloudinary configuration must be complete',
+    );
+  }
   if (!/^[a-z0-9_]{1,512}$/.test(customerAccessTemplateName)) {
     throw new Error(
       'Invalid environment: WHATSAPP_CUSTOMER_ACCESS_TEMPLATE_NAME is invalid',
@@ -206,6 +221,9 @@ export function validateEnvironment(
       900,
     ),
     CORS_ORIGINS: corsOrigins(values),
+    CLOUDINARY_CLOUD_NAME: cloudinaryCloudName,
+    CLOUDINARY_API_KEY: cloudinaryApiKey,
+    CLOUDINARY_API_SECRET: cloudinaryApiSecret,
     WHATSAPP_API_VERSION: optionalString(values, 'WHATSAPP_API_VERSION'),
     WHATSAPP_PERMANENT_TOKEN: optionalString(
       values,

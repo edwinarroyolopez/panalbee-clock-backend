@@ -7,6 +7,17 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AppointmentCreationStore } from './appointment-creation.store';
 import { AppointmentEffectsService } from './appointment-effects.service';
 import { AppointmentIntervalLockService } from './appointment-interval-lock.service';
+import { AppointmentLifecycleService } from './appointment-lifecycle.service';
+import { AppointmentTimelineService } from './appointment-timeline.service';
+import { AppointmentEvidenceService } from './appointment-evidence.service';
+import { AppointmentEvidenceStorageService } from './appointment-evidence-storage.service';
+import { AppointmentSurveyService } from './appointment-survey.service';
+import { AppointmentFeedbackEffectsService } from './appointment-feedback-effects.service';
+import {
+  PublicAppointmentFeedbackController,
+  PublicCustomerAppointmentFeedbackController,
+  TenantAppointmentFeedbackController,
+} from './appointment-feedback.controller';
 import { AppointmentLifecycleNotificationService } from './appointment-lifecycle-notification.service';
 import { AppointmentManagementAccessService } from './appointment-management-access.service';
 import { AppointmentManagementService } from './appointment-management.service';
@@ -38,6 +49,9 @@ import { CustomerAccessDeliveryService } from './customer-access-delivery.servic
     PublicAppointmentsController,
     PublicCustomerAccessController,
     PublicCustomerAppointmentsController,
+    TenantAppointmentFeedbackController,
+    PublicAppointmentFeedbackController,
+    PublicCustomerAppointmentFeedbackController,
   ],
   providers: [
     AppointmentsService,
@@ -45,6 +59,12 @@ import { CustomerAccessDeliveryService } from './customer-access-delivery.servic
     AppointmentCreationStore,
     AppointmentEffectsService,
     AppointmentIntervalLockService,
+    AppointmentLifecycleService,
+    AppointmentTimelineService,
+    AppointmentEvidenceService,
+    AppointmentEvidenceStorageService,
+    AppointmentSurveyService,
+    AppointmentFeedbackEffectsService,
     AppointmentLifecycleNotificationService,
     AppointmentManagementAccessService,
     AppointmentPublicQueryService,

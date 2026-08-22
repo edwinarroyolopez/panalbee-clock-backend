@@ -195,7 +195,7 @@ export class AvailabilityService {
             tenantId,
             locationId: location._id,
             staffId: { $in: staffIds },
-            status: { $in: ['PENDING', 'CONFIRMED'] },
+            status: { $in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
             startsAt: { $lt: dayEnd.toJSDate() },
             endsAt: { $gt: dayStart.toJSDate() },
             ...(options.excludeAppointmentId

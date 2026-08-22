@@ -34,6 +34,9 @@ is needed. Configure the approved `es_CO` templates with
 tenant name, localized appointment time, and reason in that order. Delivery
 uses the tenant's active WhatsApp channel or `WHATSAPP_PHONE_NUMBER_ID`.
 
+Start, completion, no-show, immutable timeline, satisfaction, and private-photo
+contracts are specified in [`docs/appointment-lifecycle.md`](docs/appointment-lifecycle.md).
+
 ## Routes
 
 - `GET /api/v1/health/live`, `GET /api/v1/health/ready`
@@ -46,6 +49,8 @@ uses the tenant's active WhatsApp channel or `WHATSAPP_PHONE_NUMBER_ID`.
   for a 12-hour opaque customer bearer
 - `GET|POST /api/v1/public/:tenantSlug/customer-appointments/*`, list and manage
   only appointments owned by the verified customer
+- `GET|POST /api/v1/appointments/:appointmentId/*`, tenant lifecycle, timeline,
+  and private evidence
 
 Verification codes expire after 10 minutes, allow five attempts, and are
 stored only as domain-separated HMACs. Customer session tokens are returned

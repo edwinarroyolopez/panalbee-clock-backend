@@ -189,6 +189,11 @@ export class AppointmentManagementService {
         'BOOKING_CANCELLED',
         'APPOINTMENT_CANCELLED',
         normalizedReason,
+        {
+          status: appointment.status,
+          startsAt: appointment.startsAt,
+          endsAt: appointment.endsAt,
+        },
       );
       return appointmentView(updated.toObject());
     });
@@ -265,6 +270,11 @@ export class AppointmentManagementService {
         'BOOKING_RESCHEDULED',
         'APPOINTMENT_RESCHEDULED',
         reason?.trim(),
+        {
+          status: appointment.status,
+          startsAt: appointment.startsAt,
+          endsAt: appointment.endsAt,
+        },
       );
       return appointmentView(updated.toObject());
     });

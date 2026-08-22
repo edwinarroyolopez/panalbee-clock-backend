@@ -111,4 +111,26 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('WHATSAPP_APPOINTMENT_NOTIFICATION_LANGUAGE');
   });
+
+  it('accepts absent or complete Cloudinary configuration only', () => {
+    expect(validateEnvironment(valid)).toMatchObject({
+      CLOUDINARY_CLOUD_NAME: undefined,
+      CLOUDINARY_API_KEY: undefined,
+      CLOUDINARY_API_SECRET: undefined,
+    });
+    expect(
+      validateEnvironment({
+        ...valid,
+        CLOUDINARY_CLOUD_NAME: 'clock-test',
+        CLOUDINARY_API_KEY: 'cloudinary-key',
+        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+      }),
+    ).toMatchObject({ CLOUDINARY_CLOUD_NAME: 'clock-test' });
+    expect(() =>
+      validateEnvironment({
+        ...valid,
+        CLOUDINARY_CLOUD_NAME: 'incomplete',
+      }),
+    ).toThrow('Cloudinary configuration must be complete');
+  });
 });

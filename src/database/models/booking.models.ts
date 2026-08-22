@@ -12,7 +12,21 @@ import {
 } from './schema-helpers';
 
 export type AppointmentStatus =
-  'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'IN_PROGRESS'
+  | 'CANCELLED'
+  | 'COMPLETED'
+  | 'NO_SHOW';
+
+export const APPOINTMENT_NO_SHOW_REASONS = [
+  'CUSTOMER_DID_NOT_ARRIVE',
+  'CUSTOMER_CANCELLED_TOO_LATE',
+  'COULD_NOT_CONTACT_CUSTOMER',
+  'OTHER',
+] as const;
+export type AppointmentNoShowReason =
+  (typeof APPOINTMENT_NO_SHOW_REASONS)[number];
 
 export type AppointmentSource = 'ADMIN' | 'WEB' | 'WHATSAPP' | 'OTHER';
 
@@ -32,6 +46,11 @@ export interface AppointmentEntity extends TimestampedEntity {
   notes?: string | null;
   cancelledAt?: Date | null;
   cancellationReason?: string | null;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
+  noShowAt?: Date | null;
+  noShowReason?: AppointmentNoShowReason | null;
+  outcomeNote?: string | null;
 }
 
 export interface AppointmentIntervalLockEntity extends UuidEntity {
@@ -92,7 +111,14 @@ export const AppointmentSchema: Schema<AppointmentEntity> =
       customerId: requiredUuidField(),
       status: {
         type: String,
-        enum: ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'],
+        enum: [
+          'PENDING',
+          'CONFIRMED',
+          'IN_PROGRESS',
+          'CANCELLED',
+          'COMPLETED',
+          'NO_SHOW',
+        ],
         default: 'CONFIRMED',
       },
       startsAt: { type: Date, required: true },
@@ -108,6 +134,11 @@ export const AppointmentSchema: Schema<AppointmentEntity> =
       notes: { type: String },
       cancelledAt: { type: Date },
       cancellationReason: { type: String },
+      startedAt: { type: Date },
+      completedAt: { type: Date },
+      noShowAt: { type: Date },
+      noShowReason: { type: String, enum: APPOINTMENT_NO_SHOW_REASONS },
+      outcomeNote: { type: String, maxlength: 2000 },
     },
     documentOptions<AppointmentEntity>('appointments'),
   );

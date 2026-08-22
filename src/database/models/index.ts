@@ -19,6 +19,18 @@ import {
   NotificationSchema,
 } from './booking.models';
 import {
+  AppointmentTimelineEventEntity,
+  AppointmentTimelineEventSchema,
+} from './appointment-lifecycle.models';
+import {
+  AppointmentEvidenceEntity,
+  AppointmentEvidenceSchema,
+} from './appointment-evidence.models';
+import {
+  AppointmentSurveyResponseEntity,
+  AppointmentSurveyResponseSchema,
+} from './appointment-survey.models';
+import {
   AvailabilityExceptionEntity,
   AvailabilityExceptionSchema,
   CustomerEntity,
@@ -57,6 +69,9 @@ import { UuidEntity } from './schema-helpers';
 import { UserEntity, UserSchema } from './user.model';
 
 export * from './booking.models';
+export * from './appointment-lifecycle.models';
+export * from './appointment-evidence.models';
+export * from './appointment-survey.models';
 export * from './account.models';
 export * from './communication.models';
 export * from './core.models';
@@ -85,6 +100,18 @@ export const CLOCK_MODEL_DEFINITIONS: ModelDefinition[] = [
     schema: AvailabilityExceptionSchema,
   },
   { name: MODEL_NAMES.Appointment, schema: AppointmentSchema },
+  {
+    name: MODEL_NAMES.AppointmentTimelineEvent,
+    schema: AppointmentTimelineEventSchema,
+  },
+  {
+    name: MODEL_NAMES.AppointmentEvidence,
+    schema: AppointmentEvidenceSchema,
+  },
+  {
+    name: MODEL_NAMES.AppointmentSurveyResponse,
+    schema: AppointmentSurveyResponseSchema,
+  },
   {
     name: MODEL_NAMES.AppointmentIntervalLock,
     schema: AppointmentIntervalLockSchema,
@@ -120,6 +147,9 @@ export interface ClockModels {
   schedule: Model<ScheduleEntity>;
   availabilityException: Model<AvailabilityExceptionEntity>;
   appointment: Model<AppointmentEntity>;
+  appointmentTimelineEvent: Model<AppointmentTimelineEventEntity>;
+  appointmentEvidence: Model<AppointmentEvidenceEntity>;
+  appointmentSurveyResponse: Model<AppointmentSurveyResponseEntity>;
   appointmentIntervalLock: Model<AppointmentIntervalLockEntity>;
   customerAccessChallenge: Model<CustomerAccessChallengeEntity>;
   channel: Model<ChannelEntity>;
@@ -157,6 +187,18 @@ export function clockModels(connection: Connection): ClockModels {
       MODEL_NAMES.AvailabilityException,
     ),
     appointment: registeredModel(connection, MODEL_NAMES.Appointment),
+    appointmentTimelineEvent: registeredModel(
+      connection,
+      MODEL_NAMES.AppointmentTimelineEvent,
+    ),
+    appointmentEvidence: registeredModel(
+      connection,
+      MODEL_NAMES.AppointmentEvidence,
+    ),
+    appointmentSurveyResponse: registeredModel(
+      connection,
+      MODEL_NAMES.AppointmentSurveyResponse,
+    ),
     appointmentIntervalLock: registeredModel(
       connection,
       MODEL_NAMES.AppointmentIntervalLock,

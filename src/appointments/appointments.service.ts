@@ -4,6 +4,7 @@ import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { AccountPublicAccessService } from '../accounts/account-public-access.service';
 import type { TenantOperationAuthContext } from '../auth/auth.types';
 import { AvailabilityService } from '../availability/availability.service';
+import { AppException } from '../common/app-exception';
 import { Environment } from '../config/environment';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -44,13 +45,27 @@ export class AppointmentsService {
     tenantId: string,
     query: AppointmentListQueryDto,
   ): Promise<{ items: AppointmentView[] }> {
+    if (query.attention && query.status) {
+      throw new AppException(
+        400,
+        'APPOINTMENT_FILTER_CONFLICT',
+        'Status and attention filters cannot be combined',
+      );
+    }
     const appointments = await this.database.models.appointment
       .find({
         tenantId,
         ...(query.locationId ? { locationId: query.locationId } : {}),
         ...(query.staffId ? { staffId: query.staffId } : {}),
         ...(query.customerId ? { customerId: query.customerId } : {}),
-        ...(query.status ? { status: query.status as AppointmentStatus } : {}),
+        ...(query.attention === 'OUTCOME_REQUIRED'
+          ? {
+              status: { $in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] },
+              endsAt: { $lte: new Date() },
+            }
+          : query.status
+            ? { status: query.status as AppointmentStatus }
+            : {}),
         ...(query.from || query.to
           ? {
               startsAt: {
@@ -63,7 +78,9 @@ export class AppointmentsService {
       .sort({ startsAt: 1, _id: 1 })
       .lean()
       .exec();
-    return { items: appointments.map(appointmentView) };
+    return {
+      items: appointments.map((appointment) => appointmentView(appointment)),
+    };
   }
 
   async createTenant(

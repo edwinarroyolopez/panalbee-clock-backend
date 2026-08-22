@@ -6,6 +6,7 @@ import { Server } from 'node:http';
 import request from 'supertest';
 import { AccountsModule } from '../src/accounts/accounts.module';
 import { AppointmentsModule } from '../src/appointments/appointments.module';
+import { AppointmentEvidenceStorageService } from '../src/appointments/appointment-evidence-storage.service';
 import { AuditModule } from '../src/audit/audit.module';
 import { DelegatedActionAuditInterceptor } from '../src/audit/delegated-action-audit.interceptor';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
@@ -65,12 +66,21 @@ export interface TestApp {
 
 export async function startTestApp(
   adapters?: readonly ChannelAdapter[],
+  evidenceStorage?: Pick<
+    AppointmentEvidenceStorageService,
+    'uploadPrivateImage' | 'signedUrl' | 'deletePrivateImage'
+  >,
 ): Promise<TestApp> {
   let builder = Test.createTestingModule({
     imports: [BookingAvailabilityTestModule],
   });
   if (adapters) {
     builder = builder.overrideProvider(CHANNEL_ADAPTERS).useValue(adapters);
+  }
+  if (evidenceStorage) {
+    builder = builder
+      .overrideProvider(AppointmentEvidenceStorageService)
+      .useValue(evidenceStorage);
   }
   const fixture = await builder.compile();
   const app = fixture.createNestApplication();

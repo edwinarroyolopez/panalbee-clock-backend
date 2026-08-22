@@ -17,11 +17,15 @@ import type { TenantOperationAuthContext } from '../auth/auth.types';
 import { AppException } from '../common/app-exception';
 import { APPOINTMENT_MANAGEMENT_TOKEN_HEADER } from '../common/http-headers';
 import { AppointmentManagementService } from './appointment-management.service';
+import { AppointmentLifecycleService } from './appointment-lifecycle.service';
 import {
+  AppointmentCommandDto,
   AppointmentListQueryDto,
   CancelAppointmentDto,
+  CompleteAppointmentDto,
   CreatePublicAppointmentDto,
   CreateTenantAppointmentDto,
+  NoShowAppointmentDto,
   PublicAppointmentListQueryDto,
   PublicCancelAppointmentDto,
   PublicRescheduleAppointmentDto,
@@ -39,6 +43,7 @@ export class AppointmentsController {
   constructor(
     private readonly appointments: AppointmentsService,
     private readonly management: AppointmentManagementService,
+    private readonly lifecycle: AppointmentLifecycleService,
   ) {}
 
   @TenantRoles(...TENANT_ROLES)
@@ -92,6 +97,39 @@ export class AppointmentsController {
       dto.startsAt,
       dto.reason,
     );
+  }
+
+  @TenantRoles('OWNER', 'MANAGER', 'AGENT')
+  @Post(':appointmentId/start')
+  @HttpCode(HttpStatus.OK)
+  start(
+    @CurrentAuth() auth: TenantOperationAuthContext,
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
+    @Body() dto: AppointmentCommandDto,
+  ): Promise<AppointmentView> {
+    return this.lifecycle.start(lifecycleActor(auth), appointmentId, dto);
+  }
+
+  @TenantRoles('OWNER', 'MANAGER', 'AGENT')
+  @Post(':appointmentId/complete')
+  @HttpCode(HttpStatus.OK)
+  complete(
+    @CurrentAuth() auth: TenantOperationAuthContext,
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
+    @Body() dto: CompleteAppointmentDto,
+  ): Promise<AppointmentView> {
+    return this.lifecycle.complete(lifecycleActor(auth), appointmentId, dto);
+  }
+
+  @TenantRoles('OWNER', 'MANAGER', 'AGENT')
+  @Post(':appointmentId/no-show')
+  @HttpCode(HttpStatus.OK)
+  noShow(
+    @CurrentAuth() auth: TenantOperationAuthContext,
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
+    @Body() dto: NoShowAppointmentDto,
+  ): Promise<AppointmentView> {
+    return this.lifecycle.noShow(lifecycleActor(auth), appointmentId, dto);
   }
 }
 
@@ -158,7 +196,7 @@ export class PublicAppointmentsController {
 
 const MANAGEMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,128}$/;
 
-function resolveManagementToken(
+export function resolveManagementToken(
   headerToken: string | undefined,
   queryToken: string | undefined,
 ): string {
@@ -184,4 +222,12 @@ function managementTokenError(reasonCode: string): AppException {
     reasonCode,
     'Appointment management token is invalid',
   );
+}
+
+function lifecycleActor(auth: TenantOperationAuthContext) {
+  return {
+    tenantId: auth.tenant.id,
+    actorUserId: auth.userId,
+    actorType: auth.actorType === 'DELEGATED' ? 'INTERNAL_USER' : 'TENANT_USER',
+  } as const;
 }

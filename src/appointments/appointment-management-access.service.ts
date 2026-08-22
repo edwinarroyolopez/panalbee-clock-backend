@@ -56,12 +56,12 @@ export class AppointmentManagementAccessService {
 
   async load(
     access: ManagementAccess,
-    session: ClientSession,
+    session?: ClientSession,
   ): Promise<AppointmentEntity> {
     if (access.publicOnly) {
       const activeTenant = await this.database.models.tenant
         .exists({ _id: access.tenantId, status: 'ACTIVE' })
-        .session(session)
+        .session(session ?? null)
         .exec();
       if (!activeTenant) throw appointmentNotFound();
     }
@@ -74,7 +74,7 @@ export class AppointmentManagementAccessService {
           : {}),
         ...(access.customerId ? { customerId: access.customerId } : {}),
       })
-      .session(session)
+      .session(session ?? null)
       .lean()
       .exec();
     if (!appointment) throw appointmentNotFound();

@@ -1,14 +1,18 @@
 import {
   IsEmail,
   IsIn,
+  IsInt,
   IsISO8601,
   IsOptional,
   IsString,
   IsUUID,
   Length,
   Matches,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
+import { APPOINTMENT_NO_SHOW_REASONS } from '../database/models';
 
 export class AppointmentListQueryDto {
   @IsOptional()
@@ -24,8 +28,19 @@ export class AppointmentListQueryDto {
   customerId?: string;
 
   @IsOptional()
-  @IsIn(['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED', 'NO_SHOW'])
+  @IsIn([
+    'PENDING',
+    'CONFIRMED',
+    'IN_PROGRESS',
+    'CANCELLED',
+    'COMPLETED',
+    'NO_SHOW',
+  ])
   status?: string;
+
+  @IsOptional()
+  @IsIn(['OUTCOME_REQUIRED'])
+  attention?: 'OUTCOME_REQUIRED';
 
   @IsOptional()
   @IsISO8601({ strict: true })
@@ -146,6 +161,50 @@ export class TenantRescheduleAppointmentDto extends RescheduleAppointmentDto {
 }
 
 export class PublicRescheduleAppointmentDto extends RescheduleAppointmentDto {
+  @IsString()
+  @Length(40, 128)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  managementToken!: string;
+}
+
+export class AppointmentCommandDto {
+  @IsString()
+  @Length(8, 128)
+  idempotencyKey!: string;
+}
+
+export class CompleteAppointmentDto extends AppointmentCommandDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
+}
+
+export class NoShowAppointmentDto extends CompleteAppointmentDto {
+  @IsString()
+  @IsIn(APPOINTMENT_NO_SHOW_REASONS)
+  reason!: (typeof APPOINTMENT_NO_SHOW_REASONS)[number];
+}
+
+export class UploadAppointmentEvidenceDto extends AppointmentCommandDto {}
+
+export class SubmitAppointmentSurveyDto extends AppointmentCommandDto {
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  rating!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  comment?: string;
+
+  @IsOptional()
+  @IsUUID()
+  evidenceId?: string;
+}
+
+export class PublicSubmitAppointmentSurveyDto extends SubmitAppointmentSurveyDto {
   @IsString()
   @Length(40, 128)
   @Matches(/^[A-Za-z0-9_-]+$/)
