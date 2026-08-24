@@ -4,6 +4,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { Server } from 'node:http';
 import { AccountsModule } from '../src/accounts/accounts.module';
+import { AffiliatesModule } from '../src/affiliates/affiliates.module';
 import { AuditModule } from '../src/audit/audit.module';
 import { DelegatedActionAuditInterceptor } from '../src/audit/delegated-action-audit.interceptor';
 import { AppointmentsModule } from '../src/appointments/appointments.module';
@@ -32,6 +33,7 @@ import { TenantsModule } from '../src/tenants/tenants.module';
     DatabaseModule,
     AuditModule,
     AccountsModule,
+    AffiliatesModule,
     AppointmentsModule,
     AuthModule,
     HealthModule,

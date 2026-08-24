@@ -167,7 +167,12 @@ export const ServiceSchema: Schema<ServiceEntity> = new Schema<ServiceEntity>(
     name: { type: String, required: true, trim: true },
     description: { type: String },
     durationMinutes: { type: Number, required: true, min: 5, max: 480 },
-    priceMinor: { type: Number, default: 0, min: 0 },
+    priceMinor: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: Number.MAX_SAFE_INTEGER,
+    },
     currency: { type: String, default: 'COP', minlength: 3, maxlength: 3 },
     active: { type: Boolean, default: true },
   },

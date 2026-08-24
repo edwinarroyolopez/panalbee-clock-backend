@@ -3,7 +3,7 @@ import { ClientSession } from 'mongoose';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import { AppointmentEntity } from '../database/models';
-import { tokenHash } from './appointments.service';
+import { tokenHash } from './appointment-create-input';
 
 export interface ManagementAccess {
   tenantId: string;

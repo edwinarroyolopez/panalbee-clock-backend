@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
+import type { Readable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { strict as assert } from 'node:assert';
 import { NestFactory } from '@nestjs/core';
@@ -50,6 +52,40 @@ function randomSecret(bytes = 32): string {
   return value;
 }
 
+function sensitiveValue(value: string): string {
+  redactedValues.add(value);
+  return value;
+}
+
+function redactText(value: string): string {
+  let redacted = value;
+  for (const secret of redactedValues) {
+    redacted = redacted.replaceAll(secret, '[REDACTED]');
+  }
+  return redacted;
+}
+
+function pipeRedacted(
+  source: Readable | null,
+  destination: NodeJS.WriteStream,
+): void {
+  if (!source) return;
+  source.setEncoding('utf8');
+  let pending = '';
+  source.on('data', (chunk: string) => {
+    pending += chunk;
+    let newline = pending.indexOf('\n');
+    while (newline >= 0) {
+      destination.write(redactText(pending.slice(0, newline + 1)));
+      pending = pending.slice(newline + 1);
+      newline = pending.indexOf('\n');
+    }
+  });
+  source.on('end', () => {
+    if (pending) destination.write(redactText(pending));
+  });
+}
+
 function connectedPort(name: string, fallback: number): number {
   const value = process.env[name];
   if (value === undefined) return fallback;
@@ -63,10 +99,18 @@ function connectedPort(name: string, fallback: number): number {
   return port;
 }
 
-function calendarDateInBogota(daysAhead: number): string {
+function connectedTimeZone(): string {
+  const offsetFromUtc = 12 - new Date().getUTCHours();
+  if (offsetFromUtc === 0) return 'Etc/GMT';
+  return offsetFromUtc > 0
+    ? `Etc/GMT-${offsetFromUtc}`
+    : `Etc/GMT+${Math.abs(offsetFromUtc)}`;
+}
+
+function calendarDateInTimeZone(daysAhead: number, timeZone: string): string {
   const date = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Bogota',
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -124,8 +168,10 @@ function startChild(
     cwd,
     env,
     detached: true,
-    stdio: 'inherit',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  pipeRedacted(child.stdout, process.stdout);
+  pipeRedacted(child.stderr, process.stderr);
   const managed = {} as ManagedChild;
   managed.name = name;
   managed.process = child;
@@ -218,6 +264,10 @@ async function runPlaywright(environment: NodeJS.ProcessEnv): Promise<void> {
     environment,
   );
   const result = await playwright.completion;
+  await rm(resolve(backofficeDirectory, 'test-results'), {
+    recursive: true,
+    force: true,
+  });
   if (result.error || result.code !== 0) {
     throw new Error(
       `Playwright connected suite failed (${result.signal ?? result.code ?? 'spawn'})`,
@@ -230,6 +280,7 @@ async function assertDatabaseState(
   platformAdminId: string,
   accountSlug: string,
   appointmentDate: string,
+  timeZone: string,
 ): Promise<void> {
   const models = database.models;
   assert.equal(
@@ -279,7 +330,7 @@ async function assertDatabaseState(
     .lean()
     .exec();
   assert.ok(location, 'first connected Location was not persisted');
-  assert.equal(location.timezone, 'America/Bogota');
+  assert.equal(location.timezone, timeZone);
   assert.equal(location.publicBookingEnabled, true);
   const owner = await models.user.findById(account.ownerUserId).lean().exec();
   assert.ok(owner, 'active Account owner was not persisted');
@@ -326,16 +377,16 @@ async function assertDatabaseState(
 
   assert.equal(
     await models.appointment.countDocuments({ tenantId: tenant._id }),
-    1,
-    'expected one Appointment',
+    2,
+    'expected ordinary and referred Appointments',
   );
   assert.equal(
     await models.customer.countDocuments({ tenantId: tenant._id }),
-    1,
-    'expected one public customer',
+    3,
+    'expected ordinary, affiliate, and referred Customers',
   );
   const appointment = await models.appointment
-    .findOne({ tenantId: tenant._id })
+    .findOne({ tenantId: tenant._id, status: 'CONFIRMED' })
     .lean()
     .exec();
   assert.ok(appointment, 'connected Appointment was not persisted');
@@ -506,8 +557,91 @@ async function assertDatabaseState(
     );
   }
 
+  const affiliate = await models.customer
+    .findOne({ tenantId: tenant._id, fullName: 'Connected Affiliate' })
+    .lean()
+    .exec();
+  assert.ok(affiliate, 'connected affiliate Customer was not persisted');
+  const referred = await models.customer
+    .findOne({
+      tenantId: tenant._id,
+      fullName: 'Connected Referred Customer',
+    })
+    .lean()
+    .exec();
+  assert.ok(referred, 'connected referred Customer was not persisted');
+  const code = await models.affiliateCode
+    .findOne({ tenantId: tenant._id, normalizedCode: 'CONNECTED20' })
+    .lean()
+    .exec();
+  assert.ok(code, 'connected AffiliateCode was not persisted');
+  assert.equal(code.customerId, affiliate._id);
+  assert.equal(code.status, 'RETIRED');
+  assert.equal(code.currentSlot, undefined);
+  const conversion = await models.referralConversion
+    .findOne({ tenantId: tenant._id, affiliateCodeId: code._id })
+    .lean()
+    .exec();
+  assert.ok(conversion, 'connected ReferralConversion was not persisted');
+  assert.equal(conversion.affiliateCustomerId, affiliate._id);
+  assert.equal(conversion.referredCustomerId, referred._id);
+  assert.equal(conversion.codeSnapshot, 'CONNECTED20');
+  assert.equal(conversion.grossAmountMinor, 90_000);
+  assert.equal(conversion.discountValueMinor, 9_000);
+  assert.equal(conversion.finalAmountMinor, 81_000);
+  assert.equal(conversion.commissionValueMinor, 8_100);
+  assert.equal(conversion.currency, 'COP');
+  const referredAppointment = await models.appointment
+    .findById(conversion.appointmentId)
+    .lean()
+    .exec();
+  assert.ok(referredAppointment, 'referred Appointment was not persisted');
+  assert.equal(referredAppointment.status, 'COMPLETED');
+  const payout = await models.affiliatePayout
+    .findOne({ tenantId: tenant._id, affiliateCustomerId: affiliate._id })
+    .lean()
+    .exec();
+  assert.ok(payout, 'connected AffiliatePayout was not persisted');
+  assert.equal(payout.status, 'PAID');
+  assert.equal(payout.amountMinor, 8_100);
+  assert.equal(payout.currency, 'COP');
+  assert.equal(payout.externalReference, 'CONNECTED-BANK-PAID');
+  const ledger = await models.affiliateLedgerEntry
+    .find({ tenantId: tenant._id, affiliateCustomerId: affiliate._id })
+    .sort({ createdAt: 1 })
+    .lean()
+    .exec();
+  assert.equal(ledger.length, 2, 'expected one credit and one payout debit');
+  assert.deepEqual(
+    ledger.map(({ type, direction, amountMinor }) => ({
+      type,
+      direction,
+      amountMinor,
+    })),
+    [
+      {
+        type: 'COMMISSION_EARNED',
+        direction: 'CREDIT',
+        amountMinor: 8_100,
+      },
+      { type: 'PAYOUT_PAID', direction: 'DEBIT', amountMinor: 8_100 },
+    ],
+  );
+  for (const action of [
+    'AFFILIATE_CODE_CREATED',
+    'AFFILIATE_CODE_RETIRED',
+    'AFFILIATE_PAYOUT_CREATED',
+    'AFFILIATE_PAYOUT_PAID',
+  ]) {
+    assert.equal(
+      await models.auditEvent.countDocuments({ tenantId: tenant._id, action }),
+      1,
+      `expected one ${action} audit event`,
+    );
+  }
+
   console.log(
-    '[connected] Mongo assertions passed: provisioning, catalog, booking locks, audit provenance, and revoked delegation',
+    '[connected] Mongo assertions passed: provisioning, booking, referral, ledger, payout, history, audit, and delegation',
   );
 }
 
@@ -539,12 +673,20 @@ async function runConnectedGate(): Promise<void> {
 
   const platformAdminId = randomUUID();
   const platformEmail = `platform-${randomBytes(6).toString('hex')}@connected.test`;
-  const platformPhone = `+573${randomInt(1_000_000_000).toString().padStart(9, '0')}`;
+  const platformPhone = sensitiveValue(
+    `+573${randomInt(1_000_000_000).toString().padStart(9, '0')}`,
+  );
   const platformPassword = randomSecret(24);
+  const ownerPhone = sensitiveValue(
+    `+572${randomInt(1_000_000_000).toString().padStart(9, '0')}`,
+  );
+  const ownerPassword = randomSecret(24);
   const accessTokenSecret = randomSecret();
   const managementTokenSecret = randomSecret();
   const accountSlug = `connected-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
-  const appointmentDate = calendarDateInBogota(21);
+  const timeZone = connectedTimeZone();
+  const appointmentDate = calendarDateInTimeZone(21, timeZone);
+  const affiliateAppointmentDate = calendarDateInTimeZone(0, timeZone);
 
   replicaSet = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: 'wiredTiger' },
@@ -663,14 +805,19 @@ async function runConnectedGate(): Promise<void> {
     CONNECTED_BACKOFFICE_PORT: String(BACKOFFICE_PORT),
     CONNECTED_PLATFORM_PHONE: platformPhone,
     CONNECTED_PLATFORM_PASSWORD: platformPassword,
+    CONNECTED_OWNER_PHONE: ownerPhone,
+    CONNECTED_OWNER_PASSWORD: ownerPassword,
     CONNECTED_ACCOUNT_SLUG: accountSlug,
     CONNECTED_APPOINTMENT_DATE: appointmentDate,
+    CONNECTED_AFFILIATE_APPOINTMENT_DATE: affiliateAppointmentDate,
+    CONNECTED_TIMEZONE: timeZone,
   });
   await assertDatabaseState(
     database,
     platformAdminId,
     accountSlug,
     appointmentDate,
+    timeZone,
   );
   console.log(
     `[connected] Account SaaS gate passed in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
@@ -678,11 +825,9 @@ async function runConnectedGate(): Promise<void> {
 }
 
 function redactedError(error: unknown): string {
-  let message =
-    error instanceof Error ? error.message : 'Unknown connected gate failure';
-  for (const value of redactedValues)
-    message = message.replaceAll(value, '[REDACTED]');
-  return message;
+  return redactText(
+    error instanceof Error ? error.message : 'Unknown connected gate failure',
+  );
 }
 
 void runConnectedGate()

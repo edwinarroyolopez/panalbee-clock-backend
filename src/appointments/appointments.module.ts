@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AccountsModule } from '../accounts/accounts.module';
+import { AffiliatesModule } from '../affiliates/affiliates.module';
 import { AvailabilityModule } from '../availability/availability.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { CONVERSATION_COMMAND_HANDLER } from '../conversations/conversation-command.port';
@@ -23,6 +24,7 @@ import { AppointmentManagementAccessService } from './appointment-management-acc
 import { AppointmentManagementService } from './appointment-management.service';
 import { AppointmentPublicQueryService } from './appointment-public-query.service';
 import { AppointmentRescheduleRelationService } from './appointment-reschedule-relation.service';
+import { AppointmentResultService } from './appointment-result.service';
 import {
   AppointmentsController,
   PublicAppointmentsController,
@@ -40,6 +42,7 @@ import { CustomerAccessDeliveryService } from './customer-access-delivery.servic
 @Module({
   imports: [
     AccountsModule,
+    AffiliatesModule,
     AvailabilityModule,
     ChannelsModule,
     NotificationsModule,
@@ -69,6 +72,7 @@ import { CustomerAccessDeliveryService } from './customer-access-delivery.servic
     AppointmentManagementAccessService,
     AppointmentPublicQueryService,
     AppointmentRescheduleRelationService,
+    AppointmentResultService,
     CustomerAppointmentAccessService,
     CustomerAccessDeliveryService,
     ConversationBookingHandler,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { AppointmentEvidenceStorageService } from '../src/appointments/appointment-evidence-storage.service';
-import { tokenHash } from '../src/appointments/appointments.service';
+import { tokenHash } from '../src/appointments/appointment-create-input';
 import {
   APPOINTMENT_EVIDENCE_APPEND_ONLY_ERROR,
   APPOINTMENT_SURVEY_APPEND_ONLY_ERROR,

@@ -21,6 +21,7 @@ const ids = {
   service: 'd0000000-0000-4000-8000-000000000011',
   staff: 'd0000000-0000-4000-8000-000000000012',
   customer: 'd0000000-0000-4000-8000-000000000013',
+  payout: 'd0000000-0000-4000-8000-000000000014',
 };
 const password = 'correct-password';
 const reason = 'Investigate customer configuration safely';
@@ -222,6 +223,70 @@ describe('DelegatedSession (security e2e)', () => {
       .set('x-request-id', 'delegated-profile-update')
       .send({ headline: 'Updated by delegated admin' })
       .expect(200);
+    await request(server)
+      .get(`/api/v1/customers/${ids.customer}/affiliate`)
+      .auth(accessToken, { type: 'bearer' })
+      .expect(200);
+    await request(server)
+      .post(`/api/v1/customers/${ids.customer}/affiliate-codes`)
+      .auth(accessToken, { type: 'bearer' })
+      .send({
+        code: 'DELEGATED-AFFILIATE',
+        discountType: 'NONE',
+        commissionType: 'PERCENT',
+        commissionBasisPoints: 1_000,
+      })
+      .expect(201);
+    await request(server)
+      .post(`/api/v1/customers/${ids.customer}/affiliate-payouts`)
+      .auth(accessToken, { type: 'bearer' })
+      .send({
+        idempotencyKey: 'delegated-payout-denied',
+        currency: 'COP',
+        amountMinor: 1,
+      })
+      .expect(403)
+      .expect(({ body }: { body: { reasonCode: string } }) =>
+        expect(body.reasonCode).toBe(
+          'AFFILIATE_PAYOUT_DIRECT_SESSION_REQUIRED',
+        ),
+      );
+    for (const [action, body] of [
+      [
+        'paid',
+        {
+          idempotencyKey: 'delegated-paid-denied',
+          externalReference: 'BANK-DENIED',
+        },
+      ],
+      [
+        'failed',
+        {
+          idempotencyKey: 'delegated-failed-denied',
+          reason: 'Delegated actor cannot record failure',
+        },
+      ],
+      [
+        'cancelled',
+        {
+          idempotencyKey: 'delegated-cancel-denied',
+          reason: 'Delegated actor cannot cancel payout',
+        },
+      ],
+    ] as const) {
+      await request(server)
+        .post(
+          `/api/v1/customers/${ids.customer}/affiliate-payouts/${ids.payout}/${action}`,
+        )
+        .auth(accessToken, { type: 'bearer' })
+        .send(body)
+        .expect(403)
+        .expect(({ body: response }: { body: { reasonCode: string } }) =>
+          expect(response.reasonCode).toBe(
+            'AFFILIATE_PAYOUT_DIRECT_SESSION_REQUIRED',
+          ),
+        );
+    }
     await request(server)
       .get('/api/v1/backoffice/accounts')
       .auth(accessToken, { type: 'bearer' })

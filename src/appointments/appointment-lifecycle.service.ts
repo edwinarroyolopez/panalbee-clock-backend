@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { ClientSession } from 'mongoose';
+import { AffiliateLedgerService } from '../affiliates/affiliate-ledger.service';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -30,6 +31,7 @@ export class AppointmentLifecycleService {
     private readonly database: DatabaseService,
     private readonly effects: AppointmentEffectsService,
     private readonly intervalLocks: AppointmentIntervalLockService,
+    private readonly affiliateLedger: AffiliateLedgerService,
   ) {}
 
   start(
@@ -210,6 +212,13 @@ export class AppointmentLifecycleService {
         reasonCode,
         note,
       );
+      if (eventType === 'COMPLETED') {
+        await this.affiliateLedger.earnCompletedCommission(
+          actor.tenantId,
+          appointmentId,
+          session,
+        );
+      }
       return appointmentView(updated.toObject(), now);
     });
   }

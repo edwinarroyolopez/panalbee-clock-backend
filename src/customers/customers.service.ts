@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { ClientSession } from 'mongoose';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -30,9 +31,14 @@ export class CustomersService {
     return { items: customers.map(customerView) };
   }
 
-  async get(tenantId: string, customerId: string): Promise<CustomerView> {
+  async get(
+    tenantId: string,
+    customerId: string,
+    session?: ClientSession,
+  ): Promise<CustomerView> {
     const customer = await this.database.models.customer
       .findOne({ _id: customerId, tenantId })
+      .session(session ?? null)
       .lean()
       .exec();
     if (!customer) {

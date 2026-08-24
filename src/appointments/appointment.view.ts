@@ -7,6 +7,7 @@ import {
   NotificationStatus,
 } from '../database/models';
 import type { AppointmentSurveyView } from './appointment-feedback.view';
+import type { ReferralReceiptView } from '../affiliates/affiliate.view';
 
 export interface AppointmentRecord extends AppointmentEntity {
   locationName?: string;
@@ -77,6 +78,7 @@ export interface AppointmentTimelineView {
 
 export interface PublicAppointmentResult extends AppointmentView {
   managementToken?: string;
+  referral?: ReferralReceiptView;
 }
 
 export interface TenantAppointmentLifecycleView extends AppointmentView {

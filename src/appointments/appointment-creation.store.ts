@@ -4,6 +4,7 @@ import { ClientSession } from 'mongoose';
 import { randomUUID } from 'node:crypto';
 import { AppException } from '../common/app-exception';
 import { DatabaseService } from '../database/database.service';
+import type { ServiceEntity } from '../database/models';
 import { AppointmentView, appointmentView } from './appointment.view';
 
 export interface CreateIntent {
@@ -25,11 +26,13 @@ export interface CreateIntent {
   actorType: 'TENANT_USER' | 'INTERNAL_USER' | 'CUSTOMER';
   publicOnly: boolean;
   fingerprint: string;
+  referralCode?: string;
 }
 
 export interface AppointmentRelation {
   durationMinutes: number;
   localDate: string;
+  service: ServiceEntity;
 }
 
 @Injectable()
@@ -168,6 +171,7 @@ export class AppointmentCreationStore {
       localDate: DateTime.fromISO(intent.startsAt, { setZone: true })
         .setZone(location.timezone)
         .toISODate()!,
+      service,
     };
   }
 }

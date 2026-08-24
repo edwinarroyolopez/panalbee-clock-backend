@@ -31,6 +31,24 @@ import {
   AppointmentSurveyResponseSchema,
 } from './appointment-survey.models';
 import {
+  AffiliateCodeEntity,
+  AffiliateCodeSchema,
+  AffiliateLedgerEntryEntity,
+  AffiliateLedgerEntrySchema,
+  ReferralConversionEntity,
+  ReferralConversionSchema,
+} from './affiliate.models';
+import {
+  AffiliatePayoutEntity,
+  AffiliatePayoutSchema,
+} from './affiliate-payout.model';
+import {
+  AffiliateBalanceLockEntity,
+  AffiliateBalanceLockSchema,
+  AffiliatePayoutCapacityLockEntity,
+  AffiliatePayoutCapacityLockSchema,
+} from './affiliate-lock.model';
+import {
   AvailabilityExceptionEntity,
   AvailabilityExceptionSchema,
   CustomerEntity,
@@ -72,6 +90,9 @@ export * from './booking.models';
 export * from './appointment-lifecycle.models';
 export * from './appointment-evidence.models';
 export * from './appointment-survey.models';
+export * from './affiliate.models';
+export * from './affiliate-payout.model';
+export * from './affiliate-lock.model';
 export * from './account.models';
 export * from './communication.models';
 export * from './core.models';
@@ -130,6 +151,21 @@ export const CLOCK_MODEL_DEFINITIONS: ModelDefinition[] = [
   { name: MODEL_NAMES.ProviderEvent, schema: ProviderEventSchema },
   { name: MODEL_NAMES.Notification, schema: NotificationSchema },
   { name: MODEL_NAMES.AuditEvent, schema: AuditEventSchema },
+  { name: MODEL_NAMES.AffiliateCode, schema: AffiliateCodeSchema },
+  { name: MODEL_NAMES.ReferralConversion, schema: ReferralConversionSchema },
+  {
+    name: MODEL_NAMES.AffiliateLedgerEntry,
+    schema: AffiliateLedgerEntrySchema,
+  },
+  { name: MODEL_NAMES.AffiliatePayout, schema: AffiliatePayoutSchema },
+  {
+    name: MODEL_NAMES.AffiliateBalanceLock,
+    schema: AffiliateBalanceLockSchema,
+  },
+  {
+    name: MODEL_NAMES.AffiliatePayoutCapacityLock,
+    schema: AffiliatePayoutCapacityLockSchema,
+  },
 ];
 
 export interface ClockModels {
@@ -159,6 +195,12 @@ export interface ClockModels {
   providerEvent: Model<ProviderEventEntity>;
   notification: Model<NotificationEntity>;
   auditEvent: Model<AuditEventEntity>;
+  affiliateCode: Model<AffiliateCodeEntity>;
+  referralConversion: Model<ReferralConversionEntity>;
+  affiliateLedgerEntry: Model<AffiliateLedgerEntryEntity>;
+  affiliatePayout: Model<AffiliatePayoutEntity>;
+  affiliateBalanceLock: Model<AffiliateBalanceLockEntity>;
+  affiliatePayoutCapacityLock: Model<AffiliatePayoutCapacityLockEntity>;
 }
 
 function registeredModel<T>(connection: Connection, name: string): Model<T> {
@@ -217,6 +259,24 @@ export function clockModels(connection: Connection): ClockModels {
     providerEvent: registeredModel(connection, MODEL_NAMES.ProviderEvent),
     notification: registeredModel(connection, MODEL_NAMES.Notification),
     auditEvent: registeredModel(connection, MODEL_NAMES.AuditEvent),
+    affiliateCode: registeredModel(connection, MODEL_NAMES.AffiliateCode),
+    referralConversion: registeredModel(
+      connection,
+      MODEL_NAMES.ReferralConversion,
+    ),
+    affiliateLedgerEntry: registeredModel(
+      connection,
+      MODEL_NAMES.AffiliateLedgerEntry,
+    ),
+    affiliatePayout: registeredModel(connection, MODEL_NAMES.AffiliatePayout),
+    affiliateBalanceLock: registeredModel(
+      connection,
+      MODEL_NAMES.AffiliateBalanceLock,
+    ),
+    affiliatePayoutCapacityLock: registeredModel(
+      connection,
+      MODEL_NAMES.AffiliatePayoutCapacityLock,
+    ),
   };
 }
 

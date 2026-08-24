@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { DatabaseService } from '../database/database.service';
 import { AppointmentView, appointmentView } from './appointment.view';
-import { tokenHash } from './appointments.service';
+import { tokenHash } from './appointment-create-input';
 
 @Injectable()
 export class AppointmentPublicQueryService {

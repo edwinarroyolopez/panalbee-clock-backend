@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { AccountPublicAccessService } from '../accounts/account-public-access.service';
+import { ReferralAttributionService } from '../affiliates/referral-attribution.service';
+import { normalizeAffiliateCode } from '../affiliates/affiliate-economics';
 import type { TenantOperationAuthContext } from '../auth/auth.types';
 import { AvailabilityService } from '../availability/availability.service';
 import { AppException } from '../common/app-exception';
-import { Environment } from '../config/environment';
 import { DatabaseService } from '../database/database.service';
 import {
   AppointmentStatus,
@@ -16,8 +16,14 @@ import {
   AppointmentCreationStore,
   CreateIntent,
 } from './appointment-creation.store';
+import {
+  appointmentFingerprint,
+  normalizeCreateInput,
+  tokenHash,
+} from './appointment-create-input';
 import { AppointmentEffectsService } from './appointment-effects.service';
 import { AppointmentIntervalLockService } from './appointment-interval-lock.service';
+import { AppointmentResultService } from './appointment-result.service';
 import {
   AppointmentListQueryDto,
   CreatePublicAppointmentDto,
@@ -37,8 +43,9 @@ export class AppointmentsService {
     private readonly store: AppointmentCreationStore,
     private readonly effects: AppointmentEffectsService,
     private readonly intervalLocks: AppointmentIntervalLockService,
-    private readonly config: ConfigService<Environment, true>,
     private readonly publicAccess: AccountPublicAccessService,
+    private readonly attributions: ReferralAttributionService,
+    private readonly results: AppointmentResultService,
   ) {}
 
   async list(
@@ -87,7 +94,7 @@ export class AppointmentsService {
     actor: TenantOperationAuthContext,
     dto: CreateTenantAppointmentDto,
   ): Promise<AppointmentView> {
-    const normalized = normalizeCommon(dto);
+    const normalized = normalizeCreateInput(dto);
     return this.create({
       tenantId: actor.tenant.id,
       ...normalized,
@@ -97,7 +104,10 @@ export class AppointmentsService {
       actorType:
         actor.actorType === 'DELEGATED' ? 'INTERNAL_USER' : 'TENANT_USER',
       publicOnly: false,
-      fingerprint: fingerprint({ ...normalized, customerId: dto.customerId }),
+      fingerprint: appointmentFingerprint({
+        ...normalized,
+        customerId: dto.customerId,
+      }),
     });
   }
 
@@ -108,12 +118,15 @@ export class AppointmentsService {
     const { tenant } = await this.publicAccess.resolve(tenantSlug, {
       requireBooking: true,
     });
-    const normalized = normalizeCommon(dto);
+    const normalized = normalizeCreateInput(dto);
     const publicCustomer = {
       name: dto.customerName.trim(),
       phone: dto.customerPhone,
       email: dto.customerEmail?.toLowerCase() ?? null,
     };
+    const referralCode = dto.referralCode
+      ? normalizeAffiliateCode(dto.referralCode)
+      : undefined;
     return this.create({
       tenantId: tenant._id,
       ...normalized,
@@ -122,7 +135,12 @@ export class AppointmentsService {
       actorUserId: null,
       actorType: 'CUSTOMER',
       publicOnly: true,
-      fingerprint: fingerprint({ ...normalized, ...publicCustomer }),
+      ...(referralCode ? { referralCode } : {}),
+      fingerprint: appointmentFingerprint({
+        ...normalized,
+        ...publicCustomer,
+        ...(referralCode ? { referralCode } : {}),
+      }),
     });
   }
 
@@ -139,7 +157,7 @@ export class AppointmentsService {
           );
         }
         const replay = await this.store.findReplay(intent, session);
-        if (replay) return this.withManagementToken(replay, intent);
+        if (replay) return this.results.replay(replay, intent, session);
 
         const customerId = intent.publicCustomer
           ? await this.store.upsertPublicCustomer(intent, session)
@@ -149,6 +167,15 @@ export class AppointmentsService {
           customerId,
           session,
         );
+        const attribution = intent.referralCode
+          ? await this.attributions.prepare(
+              intent.tenantId,
+              intent.referralCode,
+              customerId,
+              relation.service,
+              session,
+            )
+          : undefined;
         await this.availability.assertSlotAvailable(
           intent.tenantId,
           {
@@ -167,7 +194,7 @@ export class AppointmentsService {
 
         const appointmentId = randomUUID();
         const managementToken = intent.publicCustomer
-          ? this.managementToken(appointmentId)
+          ? this.results.managementToken(appointmentId)
           : undefined;
         const startsAt = new Date(intent.startsAt);
         const endsAt = new Date(
@@ -195,6 +222,16 @@ export class AppointmentsService {
           ],
           { session },
         );
+        const referral = attribution
+          ? await this.attributions.record(
+              intent.tenantId,
+              appointment._id,
+              customerId,
+              intent.serviceId,
+              attribution,
+              session,
+            )
+          : undefined;
         await this.intervalLocks.acquire(
           intent.tenantId,
           intent.staffId,
@@ -213,6 +250,7 @@ export class AppointmentsService {
         return {
           ...appointmentView(appointment.toObject()),
           ...(managementToken ? { managementToken } : {}),
+          ...(referral ? { referral } : {}),
         };
       });
     } catch (error) {
@@ -224,51 +262,9 @@ export class AppointmentsService {
       }
       if (isNamedDuplicateKey(error, INDEX_NAMES.appointmentIdempotency)) {
         const replay = await this.store.findReplay(intent);
-        if (replay) return this.withManagementToken(replay, intent);
+        if (replay) return this.results.replay(replay, intent);
       }
       throw error;
     }
   }
-
-  private withManagementToken(
-    appointment: AppointmentView,
-    intent: CreateIntent,
-  ): PublicAppointmentResult {
-    return {
-      ...appointment,
-      ...(intent.publicCustomer
-        ? { managementToken: this.managementToken(appointment.id) }
-        : {}),
-    };
-  }
-
-  private managementToken(appointmentId: string): string {
-    return createHmac(
-      'sha256',
-      this.config.get('MANAGEMENT_TOKEN_SECRET', { infer: true }),
-    )
-      .update(`appointment:${appointmentId}`)
-      .digest('base64url');
-  }
-}
-
-function normalizeCommon(
-  dto: CreateTenantAppointmentDto | CreatePublicAppointmentDto,
-) {
-  return {
-    locationId: dto.locationId,
-    serviceId: dto.serviceId,
-    staffId: dto.staffId,
-    startsAt: new Date(dto.startsAt).toISOString(),
-    idempotencyKey: dto.idempotencyKey,
-    notes: dto.notes?.trim() || null,
-  };
-}
-
-function fingerprint(value: object): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
-export function tokenHash(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
 }

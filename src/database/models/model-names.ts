@@ -25,6 +25,12 @@ export const MODEL_NAMES = {
   ProviderEvent: 'ProviderEvent',
   Notification: 'Notification',
   AuditEvent: 'AuditEvent',
+  AffiliateCode: 'AffiliateCode',
+  ReferralConversion: 'ReferralConversion',
+  AffiliateLedgerEntry: 'AffiliateLedgerEntry',
+  AffiliatePayout: 'AffiliatePayout',
+  AffiliateBalanceLock: 'AffiliateBalanceLock',
+  AffiliatePayoutCapacityLock: 'AffiliatePayoutCapacityLock',
 } as const;
 
 export const INDEX_NAMES = {
@@ -76,4 +82,21 @@ export const INDEX_NAMES = {
   notificationIdempotency: 'notification_idempotency_unique',
   notificationWorker: 'notification_worker_lookup',
   auditOrdering: 'audit_event_ordering',
+  affiliateCodeText: 'affiliate_code_tenant_text_unique',
+  affiliateCodeCurrentCustomer: 'affiliate_code_current_customer_unique',
+  affiliateCodeHistory: 'affiliate_code_customer_history',
+  referralConversionAppointment: 'referral_conversion_appointment_unique',
+  referralConversionAffiliateActivity: 'referral_conversion_affiliate_activity',
+  affiliateLedgerIdempotency: 'affiliate_ledger_idempotency_unique',
+  affiliateLedgerBalance: 'affiliate_ledger_balance',
+  affiliateLedgerConversionActivity: 'affiliate_ledger_conversion_activity',
+  affiliateLedgerReversal: 'affiliate_ledger_reversal_unique',
+  affiliatePayoutActivity: 'affiliate_payout_activity',
+  affiliatePayoutStatusHistory: 'affiliate_payout_status_history',
+  affiliatePayoutCreateIdempotency:
+    'affiliate_payout_create_idempotency_unique',
+  affiliatePayoutTerminalIdempotency:
+    'affiliate_payout_terminal_idempotency_unique',
+  affiliateBalanceLock: 'affiliate_balance_lock_unique',
+  affiliatePayoutCapacityLock: 'affiliate_payout_capacity_lock_unique',
 } as const;

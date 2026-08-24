@@ -19,6 +19,7 @@ import { SchedulesModule } from './schedules/schedules.module';
 import { StaffModule } from './staff/staff.module';
 import { TenantsModule } from './tenants/tenants.module';
 import { CustomersModule } from './customers/customers.module';
+import { AffiliatesModule } from './affiliates/affiliates.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { CustomersModule } from './customers/customers.module';
     HealthModule,
     TenantsModule,
     CustomersModule,
+    AffiliatesModule,
     CatalogModule,
     StaffModule,
     SchedulesModule,

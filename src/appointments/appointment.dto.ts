@@ -12,6 +12,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { APPOINTMENT_NO_SHOW_REASONS } from '../database/models';
 
 export class AppointmentListQueryDto {
@@ -113,6 +114,15 @@ export class CreatePublicAppointmentDto {
   @IsString()
   @MaxLength(2000)
   notes?: string;
+
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() || undefined : value,
+  )
+  @IsOptional()
+  @IsString()
+  @Length(4, 24)
+  @Matches(/^[A-Za-z0-9-]+$/)
+  referralCode?: string;
 }
 
 export class PublicAppointmentListQueryDto {
