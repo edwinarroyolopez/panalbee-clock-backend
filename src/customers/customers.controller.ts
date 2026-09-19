@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  Header,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -10,6 +12,8 @@ import { CurrentAuth, TenantRoles } from '../auth/auth.decorators';
 import { TENANT_ROLES } from '../auth/auth.types';
 import type { TenantAuthContext } from '../auth/auth.types';
 import { CreateCustomerDto } from './customer.dto';
+import { SearchCustomersDto } from './customer-search.dto';
+import type { CustomerSearchPage } from './customer-search.dto';
 import { CustomersService } from './customers.service';
 import type { CustomerView } from './customers.service';
 
@@ -23,6 +27,17 @@ export class CustomersController {
     @CurrentAuth() auth: TenantAuthContext,
   ): Promise<{ items: CustomerView[] }> {
     return this.customers.list(auth.tenant.id);
+  }
+
+  @TenantRoles(...TENANT_ROLES)
+  @Post('search')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  search(
+    @CurrentAuth() auth: TenantAuthContext,
+    @Body() dto: SearchCustomersDto,
+  ): Promise<CustomerSearchPage> {
+    return this.customers.search(auth.tenant.id, dto);
   }
 
   @TenantRoles(...TENANT_ROLES)

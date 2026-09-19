@@ -48,6 +48,7 @@ export const INDEX_NAMES = {
   tenantMembershipUser: 'tenant_membership_user_lookup',
   customerPhone: 'customer_phone_unique',
   customerOrdering: 'customer_ordering',
+  customerCursor: 'customer_tenant_cursor_lookup',
   serviceName: 'service_name_unique',
   servicePublic: 'service_public_lookup',
   staffLocation: 'staff_location_lookup',

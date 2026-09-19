@@ -251,6 +251,11 @@ function cleanup(): Promise<void> {
 }
 
 async function runPlaywright(environment: NodeJS.ProcessEnv): Promise<void> {
+  const outputDirectory = resolve(
+    backofficeDirectory,
+    'test-results',
+    `connected-${randomUUID()}`,
+  );
   const playwright = startChild(
     'Playwright Chromium connected suite',
     process.execPath,
@@ -259,12 +264,14 @@ async function runPlaywright(environment: NodeJS.ProcessEnv): Promise<void> {
       'test',
       '--config',
       'playwright.connected.config.ts',
+      '--output',
+      outputDirectory,
     ],
     backofficeDirectory,
     environment,
   );
   const result = await playwright.completion;
-  await rm(resolve(backofficeDirectory, 'test-results'), {
+  await rm(outputDirectory, {
     recursive: true,
     force: true,
   });
@@ -721,6 +728,7 @@ async function runConnectedGate(): Promise<void> {
     loadModule('../src/app.module');
   application = await NestFactory.create(appModule.AppModule, {
     rawBody: true,
+    logger: ['warn', 'error'],
   });
   configureApplication(application);
   await application.init();

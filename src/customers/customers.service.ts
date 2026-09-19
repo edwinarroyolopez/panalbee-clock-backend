@@ -8,6 +8,7 @@ import {
   isNamedDuplicateKey,
 } from '../database/models';
 import { CreateCustomerDto } from './customer.dto';
+import { SearchCustomersDto, CustomerSearchPage } from './customer-search.dto';
 
 export interface CustomerView {
   id: string;
@@ -45,6 +46,48 @@ export class CustomersService {
       throw new AppException(404, 'CUSTOMER_NOT_FOUND', 'Customer not found');
     }
     return customerView(customer);
+  }
+
+  async search(
+    tenantId: string,
+    dto: SearchCustomersDto,
+  ): Promise<CustomerSearchPage> {
+    const limit = dto.limit ?? 50;
+    const term = dto.query?.trim();
+    const literal = term?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const customers = await this.database.models.customer
+      .find({
+        tenantId,
+        ...(dto.cursor ? { _id: { $gt: dto.cursor } } : {}),
+        ...(literal
+          ? {
+              $or: [
+                { fullName: { $regex: literal, $options: 'i' } },
+                { phone: { $regex: literal } },
+              ],
+            }
+          : {}),
+      })
+      .select({ _id: 1, fullName: 1, phone: 1, email: 1 })
+      .sort({ _id: 1 })
+      .limit(limit + 1)
+      .maxTimeMS(1500)
+      .lean()
+      .exec();
+    const page = customers.slice(0, limit);
+    const hasMore = customers.length > limit;
+    return {
+      items: page.map((customer) => ({
+        id: customer._id,
+        fullName: customer.fullName,
+        phone: customer.phone ?? null,
+        email: customer.email ?? null,
+      })),
+      pageInfo: {
+        hasMore,
+        nextCursor: hasMore ? page[page.length - 1]._id : null,
+      },
+    };
   }
 
   async create(

@@ -159,6 +159,10 @@ CustomerSchema.index(
   { tenantId: 1, fullName: 1, _id: 1 },
   { name: INDEX_NAMES.customerOrdering },
 );
+CustomerSchema.index(
+  { tenantId: 1, _id: 1 },
+  { name: INDEX_NAMES.customerCursor },
+);
 
 export const ServiceSchema: Schema<ServiceEntity> = new Schema<ServiceEntity>(
   {
